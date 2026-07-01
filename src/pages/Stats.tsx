@@ -1,7 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useActivityStore } from '../stores/activityStore'
-import { formatDuration, sportIcon } from '../utils/formatters'
+import { formatDuration, sportIcon, fmtNum } from '../utils/formatters'
 import type { ActivitySummary } from '../types/garmin'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -395,7 +395,6 @@ export default function StatsPage() {
   const TOOLTIP_STYLE = { background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }
   const TOOLTIP_PROPS = {
     contentStyle: TOOLTIP_STYLE,
-    itemStyle: { color: '#94a3b8' },
     labelStyle: { color: '#64748b', marginBottom: 2 },
     cursor: { fill: 'rgba(255,255,255,0.04)' },
   }

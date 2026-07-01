@@ -14,7 +14,7 @@ function hrs(s: number): string {
 function scoreColor(score: number | null): string {
   if (score == null) return '#64748b'
   if (score >= 80) return '#22c55e'
-  if (score >= 60) return 'var(--color-primary)'
+  if (score >= 60) return '#3b82f6'
   if (score >= 40) return '#eab308'
   return '#ef4444'
 }
@@ -171,21 +171,46 @@ export default function SleepPage() {
                 <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} interval={4} />
                 <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={28} domain={[0, 10]} />
                 <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
-                  formatter={(v: unknown, name: string) => [`${Number(v).toFixed(1)} h`, name === 'deep' ? 'Profundo' : name === 'rem' ? 'REM' : 'Ligero']}
+                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  content={({ payload, label }) => {
+                    if (!payload?.length) return null
+                    const total = payload.reduce((s, p) => s + Number(p.value ?? 0), 0)
+                    const COLORS: Record<string, string> = { deep: '#6366f1', rem: '#a855f7', light: '#475569' }
+                    const LABELS: Record<string, string> = { deep: 'Profundo', rem: 'REM', light: 'Ligero' }
+                    return (
+                      <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: '6px 10px', fontSize: 11 }}>
+                        <div style={{ color: '#64748b', marginBottom: 4 }}>{label}</div>
+                        {payload.map(p => (
+                          <div key={p.dataKey as string} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: COLORS[p.dataKey as string] ?? '#94a3b8' }}>
+                            <span>{LABELS[p.dataKey as string] ?? p.dataKey}</span>
+                            <span>{Number(p.value).toFixed(1)} h</span>
+                          </div>
+                        ))}
+                        <div style={{ borderTop: '1px solid #334155', marginTop: 4, paddingTop: 4, display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+                          <span>Total</span>
+                          <span>{total.toFixed(1)} h</span>
+                        </div>
+                      </div>
+                    )
+                  }}
                 />
                 <Bar dataKey="deep"  stackId="a" fill="#6366f1" radius={0} />
                 <Bar dataKey="rem"   stackId="a" fill="#a855f7" radius={0} />
                 <Bar dataKey="light" stackId="a" fill="#475569" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-            <div className="flex gap-4 mt-2 justify-center">
-              {[['#6366f1','Profundo'],['#a855f7','REM'],['#475569','Ligero']].map(([c,l]) => (
-                <div key={l} className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ background: c }} />
-                  <span className="text-xs text-slate-400">{l}</span>
-                </div>
-              ))}
+            <div className="flex gap-4 mt-2 justify-between items-center">
+              <div className="flex gap-4">
+                {([['#6366f1','Profundo'],['#a855f7','REM'],['#475569','Ligero']] as [string,string][]).map(([c,l]) => (
+                  <div key={l} className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full" style={{ background: c }} />
+                    <span className="text-xs font-medium" style={{ color: c }}>{l}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="text-xs text-slate-500">
+                Total: <span className="text-slate-300 font-medium">{hrs(chartData.reduce((s,d) => s + (d.deep + d.rem + d.light) * 3600, 0))}</span>
+              </div>
             </div>
           </div>
 
@@ -204,7 +229,7 @@ export default function SleepPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                   <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} interval={4} />
                   <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={28} domain={[0, 100]} />
-                  <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+                  <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }} labelStyle={{ color: '#64748b' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                     formatter={(v: unknown) => [v, 'Puntuación']} />
                   <Area type="monotone" dataKey="score" stroke="var(--color-primary)" strokeWidth={1.5} fill="url(#scoreGrad)" dot={false} connectNulls />
                 </AreaChart>
@@ -227,7 +252,7 @@ export default function SleepPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                   <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} interval={4} />
                   <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={28} />
-                  <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+                  <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }} labelStyle={{ color: '#64748b' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                     formatter={(v: unknown) => [v, 'HRV']} />
                   <Area type="monotone" dataKey="hrv" stroke="#06b6d4" strokeWidth={1.5} fill="url(#hrvGrad)" dot={false} connectNulls />
                 </AreaChart>

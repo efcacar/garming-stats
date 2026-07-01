@@ -34,10 +34,10 @@ function GearCard({ item }: { item: GearItem }) {
     ? Math.min((usedKm / maxKm) * 100, 100)
     : null
 
-  const barColor = pct == null ? 'var(--color-primary)'
+  const barColor = pct == null ? '#22c55e'
     : pct >= 90 ? '#ef4444'
     : pct >= 70 ? '#f97316'
-    : 'var(--color-primary)'
+    : '#22c55e'
 
   return (
     <div className={`bg-slate-800/60 border rounded-xl p-5 transition-colors ${retired ? 'border-slate-700/30 opacity-60' : 'border-slate-700/50 hover:border-slate-600/60'}`}>

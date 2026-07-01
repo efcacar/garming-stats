@@ -201,7 +201,7 @@ export default function Dashboard() {
           <div className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-5">
             {sleep.length > 0 ? (() => {
               const last = sleep[sleep.length - 1]
-              const sc = !last.score ? '#64748b' : last.score >= 80 ? '#22c55e' : last.score >= 60 ? 'var(--color-primary)' : last.score >= 40 ? '#eab308' : '#ef4444'
+              const sc = !last.score ? '#64748b' : last.score >= 80 ? '#22c55e' : last.score >= 60 ? '#3b82f6' : last.score >= 40 ? '#eab308' : '#ef4444'
               const hrs = (s: number) => `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`
               const total = last.durationSeconds
               const deepPct  = total > 0 ? (last.deepSeconds  / total) * 100 : 0
@@ -262,6 +262,10 @@ export default function Dashboard() {
                     <div className="flex-1 bg-slate-900/50 rounded-lg px-2 py-1.5 text-center">
                       <div className="text-xs font-semibold text-purple-400">{hrs(last.remSeconds)}</div>
                       <div className="text-xs text-slate-600">REM</div>
+                    </div>
+                    <div className="flex-1 bg-slate-900/50 rounded-lg px-2 py-1.5 text-center">
+                      <div className="text-xs font-semibold text-slate-400">{hrs(last.lightSeconds)}</div>
+                      <div className="text-xs text-slate-600">ligero</div>
                     </div>
                     {last.avgHRV != null && (
                       <div className="flex-1 bg-slate-900/50 rounded-lg px-2 py-1.5 text-center">
