@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { ActivitySummary } from '../types/garmin'
-import { formatPace, formatDuration, formatDistance, formatRelativeTime, sportLabel, sportColor, sportIcon } from '../utils/formatters'
+import { formatPace, formatDuration, formatDistance, formatDate, sportLabel, sportColor, sportIcon } from '../utils/formatters'
 
 interface Props {
   activity: ActivitySummary
@@ -20,7 +20,7 @@ export default function ActivityCard({ activity: a, compact }: Props) {
         <span className="text-xl">{sportIcon(a.sport)}</span>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium text-slate-200 truncate">{a.title}</div>
-          <div className="text-xs text-slate-500">{formatRelativeTime(a.startTime)} · {sportLabel(a.sport)}</div>
+          <div className="text-xs text-slate-500">{formatDate(a.startTime)} · {sportLabel(a.sport)}</div>
         </div>
         {a.aerobicTE != null && (
           <div className="text-xs px-2 py-0.5 rounded-full border" style={{ color, borderColor: color + '40', background: color + '15' }}>

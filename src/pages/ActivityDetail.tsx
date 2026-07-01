@@ -5,6 +5,7 @@ import { useActivityStore } from '../stores/activityStore'
 import { formatPace, formatDuration, formatDistance, formatDate, sportLabel } from '../utils/formatters'
 import { HR_ZONE_DEFS } from '../utils/calculations'
 import ActivityMap from '../components/ActivityMap'
+import ElevationChart from '../components/ElevationChart'
 import MetricCard from '../components/MetricCard'
 
 export default function ActivityDetailPage() {
@@ -13,6 +14,7 @@ export default function ActivityDetailPage() {
   const activities = useActivityStore(s => s.activities)
   const [detail, setDetail] = useState<ActivityDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -38,7 +40,7 @@ export default function ActivityDetailPage() {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
         Actividad no encontrada.{' '}
-        <Link to="/activities" className="text-blue-400 ml-1">Volver</Link>
+        <Link to="/activities" className="text-primary ml-1">Volver</Link>
       </div>
     )
   }
@@ -56,13 +58,18 @@ export default function ActivityDetailPage() {
 
       {/* Map */}
       {detail?.gpxCoords && detail.gpxCoords.length > 0 && (
-        <div className="mb-6">
-          <ActivityMap coords={detail.gpxCoords} sport={act.sport} height={320} />
+        <div className="mb-3">
+          <ActivityMap coords={detail.gpxCoords} sport={act.sport} height={320} hoveredIdx={hoveredIdx} />
         </div>
       )}
 
+      {/* Elevation chart */}
+      {detail?.gpxCoords && detail.gpxCoords.length > 0 && (
+        <ElevationChart coords={detail.gpxCoords} onHover={setHoveredIdx} />
+      )}
+
       {/* Key metrics */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <MetricCard label="Distancia" value={formatDistance(act.distance, act.sport)} />
         <MetricCard label="Duración" value={formatDuration(act.duration)} />
         {act.sport === 'running' && act.avgPace
@@ -74,7 +81,7 @@ export default function ActivityDetailPage() {
         <MetricCard label="FC Media" value={act.avgHR > 0 ? act.avgHR : '–'} unit={act.avgHR > 0 ? 'bpm' : ''} />
       </div>
 
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <MetricCard label="FC Máxima" value={act.maxHR > 0 ? act.maxHR : '–'} unit={act.maxHR > 0 ? 'bpm' : ''} />
         <MetricCard label="Elevación +" value={act.elevationGain} unit="m" />
         {act.tss != null && <MetricCard label="TSS" value={Math.round(act.tss)} />}

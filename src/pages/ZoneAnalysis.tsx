@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useActivityStore } from '../stores/activityStore'
 import type { Sport } from '../types/garmin'
-import { estimateZonesFromHR, HR_ZONE_DEFS } from '../utils/calculations'
+import { estimateZonesFromHR, HR_ZONE_DEFS, getZoneBPM } from '../utils/calculations'
 import { formatDuration } from '../utils/formatters'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -12,6 +12,25 @@ export default function ZoneAnalysis() {
   const activities = useActivityStore(s => s.activities)
   const settings = useActivityStore(s => s.settings)
   const [sport, setSport] = useState<Sport | 'all'>('all')
+
+  const SPORT_LABELS: Record<string, string> = {
+    running: '🏃 Running',
+    cycling: '🚴 Ciclismo',
+    swimming: '🏊 Natación',
+    walking: '🚶 Caminar',
+    strength: '💪 Fuerza',
+    padel: '🎾 Pádel',
+    other: '⚡ Otro',
+  }
+
+  const availableSports = useMemo(() => {
+    const sports = [...new Set(activities.map(a => a.sport))] as Sport[]
+    return sports.sort((a, b) =>
+      (SPORT_LABELS[a] ?? a).replace(/^\S+\s/, '').localeCompare(
+        (SPORT_LABELS[b] ?? b).replace(/^\S+\s/, ''), 'es'
+      )
+    )
+  }, [activities])
 
   const filtered = useMemo(() =>
     activities.filter(a => sport === 'all' || a.sport === sport),
@@ -28,6 +47,7 @@ export default function ZoneAnalysis() {
   }, [filtered, settings.maxHR])
 
   const totalSeconds = zoneSeconds.reduce((a, b) => a + b, 0)
+  const zoneBPM = getZoneBPM(settings.maxHR)
 
   const weeklyZoneData = useMemo(() => {
     const weeks: Record<string, number[]> = {}
@@ -57,23 +77,24 @@ export default function ZoneAnalysis() {
 
   return (
     <div className="flex-1 p-6 overflow-y-auto">
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-slate-100">Análisis de Zonas</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Distribución del tiempo por zonas de FC</p>
-        </div>
-        <div className="flex bg-slate-800 rounded-lg p-0.5 gap-0.5">
-          {(['all', 'running', 'cycling', 'swimming'] as const).map(s => (
-            <button
-              key={s}
-              onClick={() => setSport(s)}
-              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                sport === s ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {s === 'all' ? 'Todos' : s === 'running' ? '🏃' : s === 'cycling' ? '🚴' : '🏊'}
-            </button>
-          ))}
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-slate-100">Análisis de Zonas</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Distribución del tiempo por zonas de FC</p>
+        <div className="flex items-center gap-2 mt-4">
+          <span className="text-xs text-slate-500 w-16">Deporte</span>
+          <div className="flex flex-wrap bg-slate-800 rounded-lg p-0.5 gap-0.5">
+            {(['all', ...availableSports] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setSport(s as Sport | 'all')}
+                className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+                  sport === s ? 'bg-primary text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {s === 'all' ? 'Todos' : (SPORT_LABELS[s] ?? s)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -83,7 +104,10 @@ export default function ZoneAnalysis() {
           return (
             <div key={def.zone} className="flex items-center gap-4">
               <div className="w-6 text-xs font-medium" style={{ color: def.color }}>Z{def.zone}</div>
-              <div className="w-24 text-xs text-slate-400">{def.name}</div>
+              <div className="w-20 text-xs text-slate-400">{def.name}</div>
+              <div className="w-24 text-xs text-slate-500 font-mono">
+                {zoneBPM[i].low}–{zoneBPM[i].high} bpm
+              </div>
               <div className="flex-1 bg-slate-800 rounded-full h-3">
                 <div
                   className="h-3 rounded-full transition-all"

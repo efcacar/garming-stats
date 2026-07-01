@@ -6,23 +6,79 @@ types that mirror these structures.
 """
 
 SPORT_MAP = {
+    # Running
     "running": "running",
     "trail_running": "running",
     "treadmill_running": "running",
+    "indoor_running": "running",
+    "track_running": "running",
+    "ultra_running": "running",
+    "obstacle_run": "running",
+    "virtual_run": "running",
+    # Cycling
     "cycling": "cycling",
+    "road_biking": "cycling",
     "road_cycling": "cycling",
-    "indoor_cycling": "cycling",
-    "virtual_ride": "cycling",
     "mountain_biking": "cycling",
+    "indoor_cycling": "cycling",
+    "indoor_biking": "cycling",
+    "virtual_ride": "cycling",
+    "gravel_cycling": "cycling",
+    "cyclocross": "cycling",
+    "track_cycling": "cycling",
+    "recumbent_cycling": "cycling",
+    "ebike_road": "cycling",
+    "ebike_mountain": "cycling",
+    "bmx": "cycling",
+    "bike_commuting": "cycling",
+    # Swimming
     "swimming": "swimming",
     "open_water_swimming": "swimming",
     "pool_swimming": "swimming",
+    # Walking / Hiking
+    "walking": "walking",
+    "indoor_walking": "walking",
+    "hiking": "walking",
+    "casual_walking": "walking",
+    "speed_walking": "walking",
+    # Strength / Gym
+    "strength_training": "strength",
+    "indoor_cardio": "strength",
+    "cardio_training": "strength",
+    "gym": "strength",
+    "bouldering": "strength",
+    "pilates": "strength",
+    "yoga": "strength",
+    # Padel / Racket sports
+    "padel": "padel",
+    "racket_sports": "padel",
+    "squash": "padel",
+    "tennis": "padel",
+    "table_tennis": "padel",
 }
+
+# Title keywords as fallback when typeKey is unknown
+_TITLE_CYCLING  = ["ciclismo", "cycling", " bici", "bike", "gravel", "mtb"]
+_TITLE_RUNNING  = ["running", "correr", "carrera", "trail", "maratón", "marathon"]
+_TITLE_SWIMMING = ["natación", "swimming", "nadar", "piscina", "swim"]
+_TITLE_WALKING  = ["caminar", "caminata", "senderismo", "hiking", "trekking", "marcha"]
+_TITLE_STRENGTH = ["fuerza", "strength", "gym", "crossfit", "musculación", "pesas"]
+_TITLE_PADEL    = ["pádel", "padel", "tenis", "tennis", "squash"]
 
 
 def _sport(activity: dict) -> str:
     raw = activity.get("activityType", {}).get("typeKey", "other").lower()
-    return SPORT_MAP.get(raw, "other")
+    if raw in SPORT_MAP:
+        return SPORT_MAP[raw]
+    # Fallback: classify by activity title keywords
+    title = (activity.get("activityName") or "").lower()
+    if any(k in title for k in _TITLE_CYCLING):  return "cycling"
+    if any(k in title for k in _TITLE_RUNNING):  return "running"
+    if any(k in title for k in _TITLE_SWIMMING): return "swimming"
+    if any(k in title for k in _TITLE_WALKING):  return "walking"
+    if any(k in title for k in _TITLE_STRENGTH): return "strength"
+    if any(k in title for k in _TITLE_PADEL):    return "padel"
+    return "other"
 
 
 def _safe(d: dict, *keys, default=None):

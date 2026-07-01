@@ -26,6 +26,16 @@ dist/data/**
 
 # Tokens de sesión de Garmin (por si se copian al proyecto)
 .garth/
+fetch/.garth/
+
+# Entorno virtual Python
+fetch/.venv/
+
+# Cache de Python
+__pycache__/
+fetch/__pycache__/
+*.py[cod]
+*.pyo
 
 # Editor directories and files
 .vscode/*

@@ -1,11 +1,45 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import type { ActivitySummary, ActivityDetail, GlobalStats, UserSettings } from '../types/garmin'
+import type { ActivitySummary, ActivityDetail, GlobalStats, UserSettings, GarminRecords, SleepEntry, GearItem } from '../types/garmin'
 import { DEFAULT_SETTINGS } from '../types/garmin'
+
+function getSystemTheme(): 'dark' | 'light' {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+function applyTheme(theme: 'dark' | 'light') {
+  document.documentElement.dataset.theme = theme
+}
+
+function applyPrimaryColor(color: string) {
+  document.documentElement.style.setProperty('--color-primary', color)
+
+  // Inject/update a style tag so Tailwind compiled classes are overridden
+  let el = document.getElementById('primary-color-overrides') as HTMLStyleElement | null
+  if (!el) {
+    el = document.createElement('style')
+    el.id = 'primary-color-overrides'
+    document.head.appendChild(el)
+  }
+  const c20 = color + '33'   // ~20% opacity
+  const c90 = color + 'e6'   // ~90% opacity
+  const c80 = color + 'cc'   // ~80% opacity
+  el.textContent = `
+    .bg-primary, [class*="bg-primary"]:not([class*="bg-primary/"]) { background-color: ${color} !important; }
+    .bg-primary\\/20 { background-color: ${c20} !important; }
+    .bg-primary\\/90 { background-color: ${c90} !important; }
+    .text-primary { color: ${color} !important; }
+    .text-primary\\/80 { color: ${c80} !important; }
+    .border-primary { border-color: ${color} !important; }
+    input[type=range] { accent-color: ${color} !important; }
+  `
+}
 
 interface ActivityState {
   activities: ActivitySummary[]
   stats: GlobalStats | null
+  records: GarminRecords | null
+  sleep: SleepEntry[]
+  gear: GearItem[]
   settings: UserSettings
   loading: boolean
   error: string | null
@@ -13,15 +47,21 @@ interface ActivityState {
 
   loadActivities: () => Promise<void>
   loadStats: () => Promise<void>
+  loadRecords: () => Promise<void>
+  loadSleep: () => Promise<void>
+  loadGear: () => Promise<void>
+  loadSettings: () => Promise<void>
   updateSettings: (s: Partial<UserSettings>) => void
   loadDetail: (id: number) => Promise<ActivityDetail | null>
 }
 
 export const useActivityStore = create<ActivityState>()(
-  persist(
     (set, get) => ({
       activities: [],
       stats: null,
+      records: null,
+      sleep: [],
+      gear: [],
       settings: DEFAULT_SETTINGS,
       loading: false,
       error: null,
@@ -51,8 +91,72 @@ export const useActivityStore = create<ActivityState>()(
         }
       },
 
+      loadGear: async () => {
+        try {
+          const res = await fetch('/data/gear.json')
+          if (!res.ok) return
+          const data: GearItem[] = await res.json()
+          set({ gear: data })
+        } catch {
+          // gear is optional
+        }
+      },
+
+      loadSleep: async () => {
+        try {
+          const res = await fetch('/data/sleep.json')
+          if (!res.ok) return
+          const data: SleepEntry[] = await res.json()
+          set({ sleep: data })
+        } catch {
+          // sleep is optional
+        }
+      },
+
+      loadRecords: async () => {
+        try {
+          const res = await fetch('/data/records.json')
+          if (!res.ok) return
+          const data: GarminRecords = await res.json()
+          set({ records: data })
+        } catch {
+          // records are optional
+        }
+      },
+
+      loadSettings: async () => {
+        try {
+          const res = await fetch('/api/settings')
+          if (!res.ok) {
+            applyTheme(getSystemTheme())
+            return
+          }
+          const data = await res.json()
+          if (data && Object.keys(data).length > 0) {
+            const theme = data.theme ?? getSystemTheme()
+            const settings = { ...DEFAULT_SETTINGS, ...data, theme }
+            set({ settings })
+            applyTheme(theme)
+            applyPrimaryColor(settings.primaryColor)
+          } else {
+            applyTheme(getSystemTheme())
+            applyPrimaryColor(DEFAULT_SETTINGS.primaryColor)
+          }
+        } catch {
+          applyTheme(getSystemTheme())
+        }
+      },
+
       updateSettings: (s) => {
-        set(state => ({ settings: { ...state.settings, ...s } }))
+        const next = { ...get().settings, ...s }
+        set({ settings: next })
+        if (s.theme) applyTheme(s.theme)
+        if (s.primaryColor) applyPrimaryColor(s.primaryColor)
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(next),
+        }).catch(() => {/* best-effort */})
       },
 
       loadDetail: async (id: number) => {
@@ -68,10 +172,5 @@ export const useActivityStore = create<ActivityState>()(
           return null
         }
       },
-    }),
-    {
-      name: 'garmin-settings',
-      partialize: (state) => ({ settings: state.settings }),
-    }
-  )
+    })
 )

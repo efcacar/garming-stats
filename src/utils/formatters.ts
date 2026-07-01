@@ -1,5 +1,9 @@
 import type { Sport } from '../types/garmin'
 
+export function fmtNum(n: number): string {
+  return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
 export function formatPace(secPerKm: number | null): string {
   if (!secPerKm) return '–'
   const m = Math.floor(secPerKm / 60)
@@ -11,7 +15,7 @@ export function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = Math.round(seconds % 60)
-  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
@@ -54,6 +58,9 @@ export function sportLabel(sport: Sport): string {
     running: 'Running',
     cycling: 'Ciclismo',
     swimming: 'Natación',
+    walking: 'Caminar',
+    strength: 'Fuerza',
+    padel: 'Pádel',
     other: 'Otro',
   }
   return labels[sport] ?? sport
@@ -63,8 +70,9 @@ export function sportIcon(sport: Sport): string {
   const icons: Record<Sport, string> = {
     running: '🏃',
     cycling: '🚴',
-    swimming: '🏊',
-    other: '⚡',
+    swimming: '🏊',    walking: '🚶',
+    strength: '💪',
+    padel: '🎾',    other: '⚡',
   }
   return icons[sport] ?? '⚡'
 }
@@ -74,6 +82,9 @@ export function sportColor(sport: Sport): string {
     running: '#ef4444',
     cycling: '#f97316',
     swimming: '#3b82f6',
+    walking: '#22c55e',
+    strength: '#a855f7',
+    padel: '#06b6d4',
     other: '#8b5cf6',
   }
   return colors[sport] ?? '#6b7280'

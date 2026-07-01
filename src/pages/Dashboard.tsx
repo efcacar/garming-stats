@@ -4,7 +4,7 @@ import { formatDuration, formatPace, sportIcon, sportColor } from '../utils/form
 import { daysAgo } from '../utils/date'
 import { useFitnessHistory } from '../hooks/useFitnessHistory'
 import { useWeekComparison } from '../hooks/useWeekComparison'
-import { useSportVolume } from '../hooks/useSportVolume'
+import { useSportVolume as _useSportVolume } from '../hooks/useSportVolume'
 import { useTrainingStreak } from '../hooks/useTrainingStreak'
 import { useZoneDistribution } from '../hooks/useZoneDistribution'
 import { useWeeklyLoad } from '../hooks/useWeeklyLoad'
@@ -46,12 +46,14 @@ function EmptyScreen() {
 export default function Dashboard() {
   const activities = useActivityStore(s => s.activities)
   const stats = useActivityStore(s => s.stats)
+  const sleep = useActivityStore(s => s.sleep)
   const loading = useActivityStore(s => s.loading)
   const error = useActivityStore(s => s.error)
+  const theme = useActivityStore(s => s.settings.theme)
 
   const { current: fitness, sparkPoints } = useFitnessHistory()
   const { current: week, previous: lastWeek } = useWeekComparison()
-  const { bySport: sportHours, totalHours, percentages } = useSportVolume(30)
+  const { bySport: _sportHours, totalHours: _totalHours, percentages: _percentages } = _useSportVolume(30)
   const streak = useTrainingStreak()
   const { slices: zoneSlices, isAerobicFocused } = useZoneDistribution(30)
   const weeklyLoad = useWeeklyLoad(16)
@@ -62,15 +64,17 @@ export default function Dashboard() {
   const tsb = fitness?.tsb ?? 0
   const ctl = fitness?.ctl ?? 0
   const atl = fitness?.atl ?? 0
-  const tsbColor = tsb > 10 ? '#22c55e' : tsb > -5 ? '#3b82f6' : tsb > -15 ? '#eab308' : tsb > -25 ? '#f97316' : '#ef4444'
+  const tsbColor = tsb > 10 ? '#22c55e' : tsb > -5 ? 'var(--color-primary)' : tsb > -15 ? '#eab308' : tsb > -25 ? '#f97316' : '#ef4444'
   const maxWeekTSS = Math.max(...weeklyLoad.map(w => w.tss), 1)
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#080f1e]">
+    <div className="flex-1 overflow-y-auto bg-slate-950">
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <div className="relative overflow-hidden px-6 pt-7 pb-6"
-        style={{ background: 'linear-gradient(135deg, #0f172a 0%, #0c1a3a 50%, #0f172a 100%)' }}>
+        style={{ background: theme === 'light'
+          ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #eff6ff 100%)'
+          : 'linear-gradient(135deg, #18181b 0%, #27272a 50%, #18181b 100%)' }}>
         <div className="absolute top-0 left-1/4 w-96 h-48 rounded-full opacity-10 blur-3xl pointer-events-none"
           style={{ background: tsbColor }} />
 
@@ -90,11 +94,11 @@ export default function Dashboard() {
           </div>
 
           {/* VO2max */}
-          {stats?.vo2maxHistory?.length ? (
+          {(stats?.currentVo2max || stats?.vo2maxHistory?.length) ? (
             <div className="text-right">
               <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">VO2max</div>
               <div className="text-3xl font-black text-purple-400" style={{ textShadow: '0 0 20px #a855f766' }}>
-                {stats.vo2maxHistory.at(-1)!.value.toFixed(1)}
+                {(stats.currentVo2max ?? stats.vo2maxHistory.at(-1)!.value).toFixed(1)}
               </div>
               <div className="text-xs text-slate-500">ml/kg/min</div>
             </div>
@@ -102,10 +106,10 @@ export default function Dashboard() {
         </div>
 
         {/* CTL / ATL radials + streak */}
-        <div className="flex items-center gap-8 mb-6">
+        <div className="flex flex-wrap items-center gap-6 mb-6">
           <div className="flex items-center gap-3">
             <RadialProgress value={ctl} max={100} color="#3b82f6" size={72} stroke={6}>
-              <span className="text-base font-bold text-blue-300">{Math.round(ctl)}</span>
+              <span className="text-base font-bold text-primary/80">{Math.round(ctl)}</span>
             </RadialProgress>
             <div>
               <div className="text-xs text-slate-500 uppercase tracking-wider">Fitness</div>
@@ -134,14 +138,6 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
-            <div className="text-right">
-              <div className="text-xs text-slate-500">{stats?.totalActivities ?? activities.length} actividades</div>
-              {stats?.syncedAt && (
-                <div className="text-xs text-slate-600">
-                  Sync: {new Date(stats.syncedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                </div>
-              )}
-            </div>
           </div>
         </div>
 
@@ -151,8 +147,8 @@ export default function Dashboard() {
             <AreaChart data={sparkPoints} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="gCTL" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="gATL" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
@@ -164,7 +160,7 @@ export default function Dashboard() {
                 contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
                 formatter={(v: unknown, n: unknown) => [String(v), String(n)]}
               />
-              <Area type="monotone" dataKey="ctl" name="Fitness" stroke="#3b82f6" strokeWidth={2} fill="url(#gCTL)" dot={false} />
+              <Area type="monotone" dataKey="ctl" name="Fitness" stroke="var(--color-primary)" strokeWidth={2} fill="url(#gCTL)" dot={false} />
               <Area type="monotone" dataKey="atl" name="Fatiga" stroke="#f97316" strokeWidth={1.5} fill="url(#gATL)" dot={false} strokeDasharray="3 2" />
             </AreaChart>
           </ResponsiveContainer>
@@ -181,7 +177,7 @@ export default function Dashboard() {
         {/* Week comparison */}
         <section>
           <SectionHeader left="Esta semana" right="vs semana anterior" />
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: 'Sesiones',    value: week.count,            prev: lastWeek.count,            fmt: (v: number) => String(v),              unit: '' },
               { label: 'Distancia',   value: week.distance,         prev: lastWeek.distance,         fmt: (v: number) => v.toFixed(1),           unit: 'km' },
@@ -200,36 +196,91 @@ export default function Dashboard() {
         </section>
 
         {/* Sport rings + Zone radar */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
           <div className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-5">
-            <div className="text-xs text-slate-500 uppercase tracking-wider mb-4">Volumen · últimos 30 días</div>
-            <div className="flex items-center justify-around">
-              {([
-                { sport: 'running' as const,  label: 'Running',  color: '#ef4444', max: 20 },
-                { sport: 'cycling' as const,  label: 'Ciclismo', color: '#f97316', max: 30 },
-                { sport: 'swimming' as const, label: 'Natación', color: '#3b82f6', max: 8  },
-              ]).map(({ sport, label, color, max }) => (
-                <div key={sport} className="flex flex-col items-center gap-2">
-                  <RadialProgress value={sportHours[sport].hours} max={max} color={color} size={80} stroke={7}>
-                    <div className="text-center">
-                      <div className="text-sm font-bold" style={{ color }}>{sportHours[sport].hours.toFixed(1)}</div>
-                      <div className="text-xs text-slate-600">h</div>
+            {sleep.length > 0 ? (() => {
+              const last = sleep[sleep.length - 1]
+              const sc = !last.score ? '#64748b' : last.score >= 80 ? '#22c55e' : last.score >= 60 ? 'var(--color-primary)' : last.score >= 40 ? '#eab308' : '#ef4444'
+              const hrs = (s: number) => `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`
+              const total = last.durationSeconds
+              const deepPct  = total > 0 ? (last.deepSeconds  / total) * 100 : 0
+              const remPct   = total > 0 ? (last.remSeconds   / total) * 100 : 0
+              const lightPct = total > 0 ? (last.lightSeconds / total) * 100 : 0
+              const awakePct = total > 0 ? (last.awakeSeconds / total) * 100 : 0
+              return (
+                <Link to="/sleep" className="block h-full group">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🌙</span>
+                      <div>
+                        <div className="text-xs font-medium text-slate-300">Última noche</div>
+                        <div className="text-xs text-slate-600">{last.date}</div>
+                      </div>
                     </div>
-                  </RadialProgress>
-                  <div className="text-center">
-                    <div className="text-xs font-medium text-slate-300">{sportIcon(sport)} {label}</div>
-                    <div className="text-xs text-slate-600">de {max}h ref.</div>
+                    <span className="text-xs text-slate-600 group-hover:text-primary transition-colors">Ver historial →</span>
                   </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-700/50 text-xs text-slate-500 text-center">
-              Total: <span className="text-slate-300 font-medium">{totalHours.toFixed(1)}h</span>
-              {totalHours > 0 && (
-                <> · R {Math.round(percentages.running)}% · C {Math.round(percentages.cycling)}% · N {Math.round(percentages.swimming)}%</>
-              )}
-            </div>
+
+                  {/* Score + duration row */}
+                  <div className="flex items-center gap-4 mb-4">
+                    {last.score != null && (
+                      <div className="relative shrink-0">
+                        <svg width="56" height="56" viewBox="0 0 56 56">
+                          <circle cx="28" cy="28" r="23" fill="none" stroke="#1e293b" strokeWidth="5"/>
+                          <circle cx="28" cy="28" r="23" fill="none" stroke={sc} strokeWidth="5"
+                            strokeDasharray={`${(last.score / 100) * 144.5} 144.5`}
+                            strokeLinecap="round" transform="rotate(-90 28 28)"
+                            style={{ transition: 'stroke-dasharray 0.6s ease' }}
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-sm font-bold" style={{ color: sc }}>{last.score}</span>
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-xl font-bold text-slate-100">{hrs(total)}</div>
+                      <div className="text-xs text-slate-500">duración total</div>
+                    </div>
+                  </div>
+
+                  {/* Phase bar */}
+                  <div className="flex h-1.5 rounded-full overflow-hidden gap-px mb-3">
+                    <div style={{ width: `${deepPct}%`,  background: '#6366f1' }} />
+                    <div style={{ width: `${remPct}%`,   background: '#a855f7' }} />
+                    <div style={{ width: `${lightPct}%`, background: '#475569' }} />
+                    <div style={{ width: `${awakePct}%`, background: '#ef444430' }} />
+                  </div>
+
+                  {/* Metrics row */}
+                  <div className="flex gap-3">
+                    <div className="flex-1 bg-slate-900/50 rounded-lg px-2 py-1.5 text-center">
+                      <div className="text-xs font-semibold text-indigo-400">{hrs(last.deepSeconds)}</div>
+                      <div className="text-xs text-slate-600">profundo</div>
+                    </div>
+                    <div className="flex-1 bg-slate-900/50 rounded-lg px-2 py-1.5 text-center">
+                      <div className="text-xs font-semibold text-purple-400">{hrs(last.remSeconds)}</div>
+                      <div className="text-xs text-slate-600">REM</div>
+                    </div>
+                    {last.avgHRV != null && (
+                      <div className="flex-1 bg-slate-900/50 rounded-lg px-2 py-1.5 text-center">
+                        <div className="text-xs font-semibold text-cyan-400">{Math.round(last.avgHRV)}</div>
+                        <div className="text-xs text-slate-600">HRV</div>
+                      </div>
+                    )}
+                    {last.restingHR != null && (
+                      <div className="flex-1 bg-slate-900/50 rounded-lg px-2 py-1.5 text-center">
+                        <div className="text-xs font-semibold text-rose-400">{last.restingHR}</div>
+                        <div className="text-xs text-slate-600">FC rep.</div>
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              )
+            })() : (
+              <div className="text-xs text-slate-500 uppercase tracking-wider">Sueño</div>
+            )}
           </div>
 
           <div className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-5">
@@ -241,7 +292,7 @@ export default function Dashboard() {
               <RadarChart data={zoneSlices} margin={{ top: 0, right: 20, bottom: 0, left: 20 }}>
                 <PolarGrid stroke="#334155" />
                 <PolarAngleAxis dataKey="zone" tick={{ fill: '#64748b', fontSize: 10 }} />
-                <Radar dataKey="pct" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} strokeWidth={1.5} />
+                <Radar dataKey="pct" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.2} strokeWidth={1.5} />
                 <Tooltip
                   contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
                   formatter={(v: unknown) => [`${v}%`, 'Tiempo']}
@@ -256,36 +307,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Weekly TSS bar chart */}
-        <div className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-5">
-          <SectionHeader left="Carga semanal (TSS) · 16 semanas" rightLink={{ to: '/fitness', label: 'Ver completo →' }} />
-          <div className="flex items-end gap-1 h-20">
-            {weeklyLoad.map((w, i) => {
-              const isCurrentWeek = i === weeklyLoad.length - 1
-              return (
-                <div key={w.week} className="flex-1 flex flex-col items-center" title={`${w.week}: ${w.tss} TSS`}>
-                  <div
-                    className="w-full rounded-t transition-all"
-                    style={{
-                      height: `${Math.max((w.tss / maxWeekTSS) * 100, 2)}%`,
-                      background: isCurrentWeek ? 'linear-gradient(to top, #3b82f6, #60a5fa)' : '#334155',
-                      boxShadow: isCurrentWeek ? '0 0 8px #3b82f660' : 'none',
-                    }}
-                  />
-                </div>
-              )
-            })}
-          </div>
-          <div className="flex justify-between mt-1">
-            <span className="text-xs text-slate-600">{weeklyLoad[0]?.week}</span>
-            <span className="text-xs text-blue-400 font-medium">
-              esta semana {week.tss > 0 ? `${Math.round(week.tss)} TSS` : ''}
-            </span>
-          </div>
-        </div>
-
-        {/* Recent activities */}
-        <section>
+        {/* Recent activities */}<section>
           <SectionHeader left="Últimas actividades" rightLink={{ to: '/activities', label: 'Ver todas →' }} />
           <div className="space-y-2">
             {activities.slice(0, 6).map(a => (
@@ -363,7 +385,7 @@ function SectionHeader({
       <div className="text-xs text-slate-500 uppercase tracking-widest">{left}</div>
       {right && <div className="text-xs text-slate-600">{right}</div>}
       {rightLink && (
-        <Link to={rightLink.to} className="text-xs text-blue-400 hover:text-blue-300">{rightLink.label}</Link>
+        <Link to={rightLink.to} className="text-xs text-primary hover:text-primary/80">{rightLink.label}</Link>
       )}
     </div>
   )

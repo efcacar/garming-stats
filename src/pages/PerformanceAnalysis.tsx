@@ -14,7 +14,7 @@ import {
   ReferenceLine, ReferenceArea, Cell,
 } from 'recharts'
 
-const RAMP_COLOR: Record<string, string> = { ok: '#3b82f6', warn: '#eab308', high: '#ef4444' }
+const RAMP_COLOR: Record<string, string> = { ok: 'var(--color-primary)', warn: '#eab308', high: '#ef4444' }
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
@@ -80,7 +80,7 @@ export default function PerformanceAnalysis() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
         {/* 1 · Aerobic Efficiency */}
         <Section
@@ -182,7 +182,7 @@ export default function PerformanceAnalysis() {
                   formatter={(v: unknown) => [Number(v).toFixed(1), 'VO2max']}
                 />
                 <ReferenceArea y1={55} y2={70} fill="#22c55e" fillOpacity={0.05} />
-                <ReferenceArea y1={48} y2={55} fill="#3b82f6" fillOpacity={0.05} />
+                <ReferenceArea y1={48} y2={55} fill="var(--color-primary)" fillOpacity={0.05} />
                 <Line type="monotone" dataKey="vo2max" stroke="#a855f7" dot={{ r: 3 }} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
@@ -190,7 +190,7 @@ export default function PerformanceAnalysis() {
             <Empty label={vo2Points.length === 0 ? 'Sin datos VO2max' : 'Pocas mediciones aún'} />
           )}
           <div className="flex gap-3 mt-2 flex-wrap">
-            {[['≥60', 'Elite', '#22c55e'], ['55–59', 'Excelente', '#3b82f6'], ['48–54', 'Buena', '#eab308'], ['<48', 'Mejorable', '#ef4444']].map(
+            {[['≥60', 'Elite', '#22c55e'], ['55–59', 'Excelente', 'var(--color-primary)'], ['48–54', 'Buena', '#eab308'], ['<48', 'Mejorable', '#ef4444']].map(
               ([r, l, c]) => <span key={r} className="text-xs" style={{ color: c }}>{r} {l}</span>
             )}
           </div>

@@ -187,55 +187,45 @@ export interface PR {
   label: string
   activityId: number
   date: string
-  pace: number       // sec/km
+  pace: number       // sec/km (for running display)
+  speed: number      // km/h  (for cycling display)
   duration: number   // seconds
 }
 
-const RUNNING_DISTANCES = [
-  { km: 1, label: '1 km' },
-  { km: 5, label: '5 km' },
-  { km: 10, label: '10 km' },
-  { km: 21.097, label: 'Half Marathon' },
-  { km: 42.195, label: 'Marathon' },
-]
-
 const CYCLING_DISTANCES = [
-  { km: 40, label: '40 km' },
-  { km: 90, label: '90 km' },
-  { km: 180, label: '180 km (Full IM)' },
+  { km: 20,  label: '20 km',  window: 0.20 },
+  { km: 40,  label: '40 km',  window: 0.18 },
+  { km: 60,  label: '60 km',  window: 0.15 },
+  { km: 100, label: '100 km', window: 0.12 },
 ]
 
 export function computePRs(activities: ActivitySummary[]): Record<string, PR[]> {
-  const running = activities.filter(a => a.sport === 'running')
   const cycling = activities.filter(a => a.sport === 'cycling')
-
-  return {
-    running: findPRsForSport(running, RUNNING_DISTANCES),
-    cycling: findPRsForSport(cycling, CYCLING_DISTANCES),
-  }
+  return { cycling: findCyclingPRs(cycling) }
 }
 
-function findPRsForSport(
+function findCyclingPRs(
   activities: ActivitySummary[],
-  distances: { km: number; label: string }[]
 ): PR[] {
-  return distances.map(({ km, label }) => {
-    const candidates = activities.filter(a => a.distance >= km * 0.95)
+  return CYCLING_DISTANCES.map(({ km, label, window: w }) => {
+    const lo = km * (1 - w)
+    const hi = km * (1 + w)
+    const candidates = activities.filter(
+      a => a.distance >= lo && a.distance <= hi && (a.avgSpeed ?? 0) > 0
+    )
     if (candidates.length === 0) return null
 
-    // Best pace for approximately this distance
     let best: PR | null = null
     for (const act of candidates) {
-      if (!act.avgPace) continue
-      const pace = act.avgPace
-      if (!best || pace < best.pace) {
+      const speed = act.avgSpeed!
+      if (!best || speed > best.speed) {
         best = {
-          distance: km,
-          label,
+          distance: km, label,
           activityId: act.id,
           date: act.startTime.slice(0, 10),
-          pace,
-          duration: Math.round(km * pace),
+          pace: act.avgPace ?? 0,
+          speed,
+          duration: Math.round(km / speed * 3600),
         }
       }
     }

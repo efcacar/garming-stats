@@ -13,22 +13,70 @@
   --color-zone3: #eab308;
   --color-zone4: #f97316;
   --color-zone5: #ef4444;
+
+  --color-primary: #3b82f6;
 }
 
 * {
   box-sizing: border-box;
 }
 
+button {
+  cursor: pointer;
+}
+
 body {
   margin: 0;
-  background: #0f172a;
-  color: #e2e8f0;
+  background: #18181b;
+  color: #e4e4e7;
   font-family: system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 /* Leaflet overrides */
 .leaflet-container {
-  background: #1e293b;
+  background: #27272a;
   border-radius: 0.5rem;
+}
+
+/* ── Dark theme: replace bluish slate with neutral zinc ──────────────────── */
+:root {
+  --color-slate-950: #09090b;
+  --color-slate-900: #18181b;
+  --color-slate-800: #27272a;
+  --color-slate-700: #3f3f46;
+  --color-slate-600: #52525b;
+  --color-slate-500: #71717a;
+  --color-slate-400: #a1a1aa;
+  --color-slate-300: #d4d4d8;
+  --color-slate-200: #e4e4e7;
+  --color-slate-100: #f4f4f5;
+  --color-slate-50:  #fafafa;
+}
+
+/* ── Light theme ─────────────────────────────────────────────────────────── */
+html[data-theme="light"] {
+  color-scheme: light;
+
+  /* Flip the slate scale: darks become lights, lights become darks */
+  --color-slate-950: #ffffff;
+  --color-slate-900: #f8fafc;
+  --color-slate-800: #f1f5f9;
+  --color-slate-700: #e2e8f0;
+  --color-slate-600: #cbd5e1;
+  --color-slate-500: #94a3b8;
+  --color-slate-400: #64748b;
+  --color-slate-300: #475569;
+  --color-slate-200: #334155;
+  --color-slate-100: #1e293b;
+  --color-slate-50:  #0f172a;
+}
+
+html[data-theme="light"] body {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+html[data-theme="light"] .leaflet-container {
+  background: #e2e8f0;
 }
