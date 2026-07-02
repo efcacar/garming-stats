@@ -6,6 +6,12 @@ import { resolve } from 'node:path'
 import { readFileSync, writeFileSync } from 'node:fs'
 
 export default defineConfig({
+  server: {
+    watch: {
+      // Sync writes many JSON files under public/data; ignore them to avoid full-page reloads.
+      ignored: ['**/public/data/**'],
+    },
+  },
   plugins: [
     tailwindcss(),
     react(),
