@@ -62,7 +62,7 @@ export default function Sidebar({ open, onClose }: Props) {
     try {
       const res = await fetch('/api/sync', { method: 'POST' })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.log || 'Error')
+      if (!res.ok) throw new Error(json.log || json.error || 'Error')
       await Promise.all([loadActivities(), loadStats(), loadRecords(), loadSleep()])
       finishProgress(true)
     } catch (e) {

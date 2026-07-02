@@ -50,14 +50,25 @@ export default defineConfig({
           }
 
           const scriptPath = resolve(__dirname, 'fetch/sync.py')
-          const proc = spawn('fetch/.venv/bin/python3', [scriptPath], {
-            cwd: resolve(__dirname),
-            env: { ...process.env },
-          })
+          let proc
+          try {
+            proc = spawn(process.env.GARMIN_PYTHON ?? 'python3', [scriptPath], {
+              cwd: resolve(__dirname),
+              env: { ...process.env },
+            })
+          } catch (e) {
+            res.writeHead(500, CT).end(JSON.stringify({ ok: false, log: `Spawn failed: ${String(e)}` }))
+            return
+          }
 
           const lines: string[] = []
           proc.stdout.on('data', (d) => lines.push(d.toString()))
           proc.stderr.on('data', (d) => lines.push(d.toString()))
+          proc.on('error', (e) => {
+            if (res.headersSent) return
+            res.writeHead(500, CT)
+            res.end(JSON.stringify({ ok: false, log: `Spawn error: ${String(e)}` }))
+          })
 
           proc.on('close', (code) => {
             if (res.headersSent) return
@@ -76,15 +87,25 @@ export default defineConfig({
           }
 
           const scriptPath = resolve(__dirname, 'fetch/import_settings.py')
-          const proc = spawn('fetch/.venv/bin/python3', [scriptPath], {
-            cwd: resolve(__dirname),
-            env: { ...process.env },
-          })
+          let proc
+          try {
+            proc = spawn(process.env.GARMIN_PYTHON ?? 'python3', [scriptPath], {
+              cwd: resolve(__dirname),
+              env: { ...process.env },
+            })
+          } catch (e) {
+            res.writeHead(500, CT).end(JSON.stringify({ error: `Spawn failed: ${String(e)}` }))
+            return
+          }
 
           let stdout = ''
           let stderr = ''
           proc.stdout.on('data', (d) => { stdout += d.toString() })
           proc.stderr.on('data', (d) => { stderr += d.toString() })
+          proc.on('error', (e) => {
+            if (res.headersSent) return
+            res.writeHead(500, CT).end(JSON.stringify({ error: `Spawn error: ${String(e)}` }))
+          })
 
           proc.on('close', (code) => {
             if (res.headersSent) return
