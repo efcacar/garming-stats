@@ -121,6 +121,7 @@ def fetch_activity_splits(api, activity_id: int) -> dict:
 def fetch_gpx_coords(api, activity_id: int) -> list:
     """Return [[lat, lon, ele?], ...] from GPX download, or [] on failure."""
     import re
+    import xml.etree.ElementTree as ET
     import garminconnect
     try:
         gpx_data = api.download_activity(
@@ -130,23 +131,47 @@ def fetch_gpx_coords(api, activity_id: int) -> list:
         if not gpx_data:
             return []
         text = gpx_data.decode("utf-8", errors="ignore")
-        # Extract full trkpt blocks to capture lat, lon and optional ele
-        blocks = re.findall(
-            r'<trkpt lat="([\d.\-]+)" lon="([\d.\-]+)"[^>]*>(.*?)</trkpt>',
-            text, re.DOTALL
-        )
         coords = []
-        for lat, lon, inner in blocks:
-            point: list = [float(lat), float(lon)]
-            ele_m = re.search(r'<ele>([\d.\-]+)</ele>', inner)
-            if ele_m:
-                point.append(round(float(ele_m.group(1)), 1))
-            coords.append(point)
+
+        # Primary parser: namespace-safe XML parsing for trkpt/ele.
+        try:
+            root = ET.fromstring(text)
+            for trkpt in root.iter():
+                if not trkpt.tag.endswith("trkpt"):
+                    continue
+                lat = trkpt.attrib.get("lat")
+                lon = trkpt.attrib.get("lon")
+                if lat is None or lon is None:
+                    continue
+                point: list = [float(lat), float(lon)]
+                ele_val = None
+                for child in trkpt:
+                    if child.tag.endswith("ele") and child.text:
+                        ele_val = child.text
+                        break
+                if ele_val is not None:
+                    point.append(round(float(ele_val), 1))
+                coords.append(point)
+        except Exception:
+            # Fallback regex parser for malformed GPX payloads.
+            blocks = re.findall(
+                r'<trkpt lat="([\d.\-]+)" lon="([\d.\-]+)"[^>]*>(.*?)</trkpt>',
+                text,
+                re.DOTALL,
+            )
+            for lat, lon, inner in blocks:
+                point: list = [float(lat), float(lon)]
+                ele_m = re.search(r'<ele>([\d.\-]+)</ele>', inner)
+                if ele_m:
+                    point.append(round(float(ele_m.group(1)), 1))
+                coords.append(point)
+
         if len(coords) > 500:
             step = len(coords) // 500
             coords = coords[::step]
         return coords
-    except Exception:
+    except Exception as e:
+        print(f"  WARNING: gpx {activity_id}: {e}")
         return []
 
 
@@ -154,6 +179,23 @@ def save_json(path: Path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+
+
+def _needs_gpx_backfill(detail_path: Path) -> bool:
+    """True when cached detail exists but misses route or elevation in route points."""
+    if not detail_path.exists():
+        return False
+    try:
+        cached = json.loads(detail_path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+
+    coords = cached.get("gpxCoords") or []
+    if not coords:
+        return True
+
+    # Some old files may have [lat, lon] only; consider that as missing altimetry.
+    return not any(isinstance(c, list) and len(c) >= 3 for c in coords)
 
 
 BEST_EFFORT_KMS = [
@@ -488,7 +530,22 @@ def main():
         detail_path = output_dir / f"activity_{activity_id}.json"
 
         if detail_path.exists() and not args.force:
-            print(f"  [{i+1}/{len(summaries)}] {activity_id} — already cached, skipping")
+            if args.no_gpx or not _needs_gpx_backfill(detail_path):
+                print(f"  [{i+1}/{len(summaries)}] {activity_id} — already cached, skipping")
+                continue
+            print(f"  [{i+1}/{len(summaries)}] {activity_id} — cached without map/altimetry, backfilling GPX...")
+            try:
+                cached = json.loads(detail_path.read_text(encoding="utf-8"))
+            except Exception:
+                cached = {}
+            gpx_coords = fetch_gpx_coords(api, activity_id)
+            if gpx_coords:
+                cached["gpxCoords"] = gpx_coords
+                save_json(detail_path, cached)
+                print(f"    Backfilled {len(gpx_coords)} GPX points")
+            else:
+                print("    WARNING: GPX still unavailable")
+            time.sleep(0.3)
             continue
 
         print(f"  [{i+1}/{len(summaries)}] Fetching {activity_id} ({summary.get('title', '')})...")
