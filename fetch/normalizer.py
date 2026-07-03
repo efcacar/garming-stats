@@ -106,6 +106,18 @@ def normalize_summary(activity: dict) -> dict:
         "duration": round(_safe(activity, "duration") or 0),  # seconds
         "movingTime": round(_safe(activity, "movingDuration") or _safe(activity, "duration") or 0),
         "elevationGain": round(_safe(activity, "elevationGain") or 0),
+        "elevationLoss": round(
+            _safe(activity, "elevationLoss")
+            or _safe(activity, "totalDescent")
+            or _safe(activity, "totalDescentInMeters")
+            or 0
+        ),
+        "maxElevation": round(
+            _safe(activity, "maxElevation")
+            or _safe(activity, "maximumElevation")
+            or _safe(activity, "maxElevationInMeters")
+            or 0
+        ) or None,
         "avgHR": round(_safe(activity, "averageHR") or 0),
         "maxHR": round(_safe(activity, "maxHR") or 0),
         "calories": round(_safe(activity, "calories") or 0),

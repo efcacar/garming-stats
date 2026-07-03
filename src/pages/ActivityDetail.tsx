@@ -81,9 +81,11 @@ export default function ActivityDetailPage() {
         <MetricCard label="FC Media" value={act.avgHR > 0 ? act.avgHR : '–'} unit={act.avgHR > 0 ? 'bpm' : ''} />
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
         <MetricCard label="FC Máxima" value={act.maxHR > 0 ? act.maxHR : '–'} unit={act.maxHR > 0 ? 'bpm' : ''} />
         <MetricCard label="Elevación +" value={act.elevationGain} unit="m" />
+        <MetricCard label="Descenso" value={act.elevationLoss} unit="m" />
+        <MetricCard label="Altitud máx." value={act.maxElevation ?? '–'} unit={act.maxElevation != null ? 'm' : ''} />
         {act.tss != null && <MetricCard label="TSS" value={Math.round(act.tss)} />}
         {act.sport === 'cycling' && act.avgPower
           ? <MetricCard label="Potencia media" value={act.avgPower} unit="W" />

@@ -28,6 +28,8 @@ export interface ActivitySummary {
   duration: number     // seconds
   movingTime: number   // seconds
   elevationGain: number
+  elevationLoss: number
+  maxElevation: number | null
   avgHR: number
   maxHR: number
   calories: number
