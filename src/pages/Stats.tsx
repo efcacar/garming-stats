@@ -181,10 +181,17 @@ function CalendarHeatmap({ activities, year }: { activities: ActivitySummary[]; 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function StatsPage() {
   const activities = useActivityStore(s => s.activities)
-  const [sportFilter, setSportFilter] = useState<string>('all')
+  const [selectedSports, setSelectedSports] = useState<Set<Sport>>(new Set())
   const [hiddenYears, setHiddenYears] = useState<Set<string>>(new Set())
   const toggleYear = (y: string) => setHiddenYears(prev => {
     const next = new Set(prev); next.has(y) ? next.delete(y) : next.add(y); return next
+  })
+  const toggleSport = (sport: Sport | 'all') => setSelectedSports(prev => {
+    if (sport === 'all') return new Set()
+    const next = new Set(prev)
+    if (next.has(sport)) next.delete(sport)
+    else next.add(sport)
+    return next
   })
 
   const years = useMemo(() => {
@@ -198,8 +205,8 @@ export default function StatsPage() {
   const [calYear, setCalYear] = useState<number>(() => new Date().getFullYear())
 
   const filtered = useMemo(() =>
-    sportFilter === 'all' ? activities : activities.filter(a => a.sport === sportFilter),
-    [activities, sportFilter]
+    selectedSports.size === 0 ? activities : activities.filter(a => selectedSports.has(a.sport)),
+    [activities, selectedSports]
   )
 
   const availableSports = useMemo(() => {
@@ -457,8 +464,9 @@ export default function StatsPage() {
           <span className="text-xs text-slate-500 w-16">Deporte</span>
           <div className="flex flex-wrap bg-slate-800 rounded-lg p-0.5 gap-0.5">
             {['all', ...availableSports].map(sp => (
-              <button key={sp} onClick={() => setSportFilter(sp)}
-                className={`px-3 py-1.5 rounded-md text-sm transition-colors ${sportFilter === sp ? 'bg-primary text-white' : 'text-slate-400 hover:text-slate-200'}`}>
+              <button key={sp} onClick={() => toggleSport(sp as Sport | 'all')}
+                aria-pressed={sp === 'all' ? selectedSports.size === 0 : selectedSports.has(sp as Sport)}
+                className={`px-3 py-1.5 rounded-md text-sm transition-colors ${(sp === 'all' ? selectedSports.size === 0 : selectedSports.has(sp as Sport)) ? 'bg-primary text-white' : 'text-slate-400 hover:text-slate-200'}`}>
                 {sp === 'all' ? 'Todos' : sp === 'running' ? '🏃 Running' : sp === 'cycling' ? '🚴 Ciclismo' : sp === 'swimming' ? '🏊 Natación' : sp === 'walking' ? '🚶 Caminar' : sp === 'strength' ? '💪 Fuerza' : sp === 'padel' ? '🎾 Pádel' : '⚡ Otro'}
               </button>
             ))}
@@ -506,7 +514,7 @@ export default function StatsPage() {
             </div>
           }
         >
-          <CalendarHeatmap activities={sportFilter === 'all' ? activities : filtered} year={calYear} />
+          <CalendarHeatmap activities={selectedSports.size === 0 ? activities : filtered} year={calYear} />
           <div className="flex items-center gap-2 mt-3 justify-end">
             <span className="text-xs text-slate-600">Menos</span>
             {['#1e293b', '#1d4ed8', '#2563eb', 'var(--color-primary)', '#60a5fa'].map(c => (

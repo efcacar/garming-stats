@@ -11,7 +11,14 @@ import {
 export default function ZoneAnalysis() {
   const activities = useActivityStore(s => s.activities)
   const settings = useActivityStore(s => s.settings)
-  const [sport, setSport] = useState<Sport | 'all'>('all')
+  const [selectedSports, setSelectedSports] = useState<Set<Sport>>(new Set())
+  const toggleSport = (sport: Sport | 'all') => setSelectedSports(prev => {
+    if (sport === 'all') return new Set()
+    const next = new Set(prev)
+    if (next.has(sport)) next.delete(sport)
+    else next.add(sport)
+    return next
+  })
 
   const SPORT_LABELS: Record<string, string> = {
     running: '🏃 Running',
@@ -33,8 +40,8 @@ export default function ZoneAnalysis() {
   }, [activities])
 
   const filtered = useMemo(() =>
-    activities.filter(a => sport === 'all' || a.sport === sport),
-    [activities, sport]
+    activities.filter(a => selectedSports.size === 0 || selectedSports.has(a.sport)),
+    [activities, selectedSports]
   )
 
   const zoneSeconds = useMemo(() => {
@@ -86,10 +93,9 @@ export default function ZoneAnalysis() {
             {(['all', ...availableSports] as const).map(s => (
               <button
                 key={s}
-                onClick={() => setSport(s as Sport | 'all')}
-                className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                  sport === s ? 'bg-primary text-white' : 'text-slate-400 hover:text-slate-200'
-                }`}
+                onClick={() => toggleSport(s as Sport | 'all')}
+                aria-pressed={s === 'all' ? selectedSports.size === 0 : selectedSports.has(s as Sport)}
+                className={`px-3 py-1.5 rounded-md text-sm transition-colors ${(s === 'all' ? selectedSports.size === 0 : selectedSports.has(s as Sport)) ? 'bg-primary text-white' : 'text-slate-400 hover:text-slate-200'}`}
               >
                 {s === 'all' ? 'Todos' : (SPORT_LABELS[s] ?? s)}
               </button>

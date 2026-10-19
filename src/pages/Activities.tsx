@@ -33,11 +33,22 @@ const SORT_OPTIONS = [
 
 export default function Activities() {
   const activities = useActivityStore(s => s.activities)
-  const [sportFilter, setSportFilter] = useState<Sport | 'all'>('all')
+  const [selectedSports, setSelectedSports] = useState<Set<Sport>>(new Set())
   const [yearFilter, setYearFilter] = useState<string>('all')
   const [distFilter, setDistFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<string>('date-desc')
   const [page, setPage] = useState(0)
+
+  function toggleSport(sport: Sport | 'all') {
+    setSelectedSports(current => {
+      if (sport === 'all') return new Set()
+      const next = new Set(current)
+      if (next.has(sport)) next.delete(sport)
+      else next.add(sport)
+      return next
+    })
+    setPage(0)
+  }
 
   const PAGE_SIZE = 20
 
@@ -58,7 +69,7 @@ export default function Activities() {
   const filtered = useMemo(() => {
     const range = DISTANCE_RANGES.find(r => r.value === distFilter) ?? DISTANCE_RANGES[0]
     const list = activities.filter(a => {
-      if (sportFilter !== 'all' && a.sport !== sportFilter) return false
+      if (selectedSports.size > 0 && !selectedSports.has(a.sport)) return false
       if (yearFilter !== 'all' && !a.startTime.startsWith(yearFilter)) return false
       if (a.distance < range.min || a.distance >= range.max) return false
       return true
@@ -73,15 +84,15 @@ export default function Activities() {
         default:          return b.startTime.localeCompare(a.startTime)
       }
     })
-  }, [activities, sportFilter, yearFilter, distFilter, sortBy])
+  }, [activities, selectedSports, yearFilter, distFilter, sortBy])
 
   const paginated = filtered.slice(0, (page + 1) * PAGE_SIZE)
   const hasMore = paginated.length < filtered.length
 
   function resetFilters() {
-    setSportFilter('all'); setYearFilter('all'); setDistFilter('all'); setSortBy('date-desc'); setPage(0)
+    setSelectedSports(new Set()); setYearFilter('all'); setDistFilter('all'); setSortBy('date-desc'); setPage(0)
   }
-  const isFiltered = sportFilter !== 'all' || yearFilter !== 'all' || distFilter !== 'all' || sortBy !== 'date-desc'
+  const isFiltered = selectedSports.size > 0 || yearFilter !== 'all' || distFilter !== 'all' || sortBy !== 'date-desc'
 
   return (
     <div className="flex-1 p-6 overflow-y-auto">
@@ -98,9 +109,10 @@ export default function Activities() {
             {[{ value: 'all' as const, label: 'Todos' }, ...availableSports.map(s => ({ value: s, label: SPORT_LABELS[s] ?? s }))].map(({ value, label }) => (
               <button
                 key={value}
-                onClick={() => { setSportFilter(value); setPage(0) }}
+                onClick={() => toggleSport(value)}
+                aria-pressed={value === 'all' ? selectedSports.size === 0 : selectedSports.has(value)}
                 className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                  sportFilter === value ? 'bg-primary text-white' : 'text-slate-400 hover:text-slate-200'
+                  (value === 'all' ? selectedSports.size === 0 : selectedSports.has(value)) ? 'bg-primary text-white' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 {label}
