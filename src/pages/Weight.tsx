@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useActivityStore } from '../stores/activityStore'
 import type { WeightEntry } from '../types/garmin'
 import {
   ResponsiveContainer,
   Line,
+  LineChart,
   XAxis,
   YAxis,
   Tooltip,
@@ -12,6 +13,25 @@ import {
   Area,
   ComposedChart,
 } from 'recharts'
+
+type BodyMetricKey = 'bmi' | 'bodyFatPct' | 'muscleMassKg' | 'bodyWaterPct' | 'boneMassKg' | 'visceralFat' | 'metabolicAge'
+
+type BodyMetricDef = {
+  key: BodyMetricKey
+  label: string
+  color: string
+  fmt: (v: number) => string
+}
+
+const BODY_METRICS: BodyMetricDef[] = [
+  { key: 'bmi', label: 'IMC', color: '#22d3ee', fmt: (v) => v.toFixed(1) },
+  { key: 'bodyFatPct', label: '% Grasa', color: '#f97316', fmt: (v) => `${v.toFixed(1)}%` },
+  { key: 'muscleMassKg', label: 'Masa muscular', color: '#10b981', fmt: (v) => `${v.toFixed(1)} kg` },
+  { key: 'bodyWaterPct', label: '% Agua corporal', color: '#3b82f6', fmt: (v) => `${v.toFixed(1)}%` },
+  { key: 'boneMassKg', label: 'Masa osea', color: '#a78bfa', fmt: (v) => `${v.toFixed(1)} kg` },
+  { key: 'visceralFat', label: 'Grasa visceral', color: '#ef4444', fmt: (v) => v.toFixed(1) },
+  { key: 'metabolicAge', label: 'Edad metabolica', color: '#f59e0b', fmt: (v) => `${Math.round(v)}` },
+]
 
 function fmtKg(v: number): string {
   return `${v.toFixed(1)} kg`
@@ -56,6 +76,48 @@ function findClosestPast(entries: WeightEntry[], targetDate: string, minDays: nu
 
 export default function WeightPage() {
   const weight = useActivityStore(s => s.weight)
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+
+  const filteredWeight = useMemo(
+    () => weight.filter((e) => {
+      if (fromDate && e.date < fromDate) return false
+      if (toDate && e.date > toDate) return false
+      return true
+    }),
+    [weight, fromDate, toDate]
+  )
+  const hasActiveFilter = Boolean(fromDate || toDate)
+  const activeRangeLabel = hasActiveFilter
+    ? `Rango activo: ${fromDate || 'inicio'} → ${toDate || 'hoy'}`
+    : null
+
+  const last180 = filteredWeight.slice(-180)
+
+  const compositionSeries = useMemo(
+    () => BODY_METRICS
+      .map(metric => {
+        const points = last180
+          .filter((e) => e[metric.key] != null)
+          .map((e) => ({
+            date: e.date,
+            d: e.date.slice(5),
+            value: Number(e[metric.key]),
+            weightKg: e.weightKg,
+          }))
+
+        const latestPoint = points[points.length - 1]
+
+        return {
+          ...metric,
+          points,
+          latestValue: latestPoint?.value ?? null,
+          latestDate: latestPoint?.date ?? null,
+        }
+      })
+      .filter(metric => metric.points.length > 0),
+    [last180]
+  )
 
   if (weight.length === 0) {
     return (
@@ -65,7 +127,60 @@ export default function WeightPage() {
     )
   }
 
-  const last180 = weight.slice(-180)
+  if (filteredWeight.length === 0) {
+    return (
+      <div className="flex-1 p-6 overflow-y-auto">
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 mb-4">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">Filtrar por fechas</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+            <label className="text-xs text-slate-400">
+              Desde
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-200"
+              />
+            </label>
+            <label className="text-xs text-slate-400">
+              Hasta
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-200"
+              />
+            </label>
+            <div className="sm:col-span-2 flex flex-col items-start gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setFromDate('')
+                  setToDate('')
+                }}
+                disabled={!hasActiveFilter}
+                title={hasActiveFilter ? 'Quitar rango de fechas aplicado' : 'No hay filtro aplicado'}
+                className={`text-xs font-medium underline underline-offset-4 decoration-transparent transition-colors ${hasActiveFilter
+                  ? 'text-primary hover:decoration-current'
+                  : 'text-slate-500 cursor-not-allowed'
+                }`}
+              >
+                Restablecer fechas
+              </button>
+              {activeRangeLabel && (
+                <div className="text-xs text-slate-500 text-left">{activeRangeLabel}</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center text-slate-500 text-sm py-12">
+          No hay registros de peso en ese rango de fechas.
+        </div>
+      </div>
+    )
+  }
+
   const values = last180.map(e => e.weightKg)
   const trend = movingAverage(values, 7)
   const chartData = last180.map((e, i) => ({
@@ -74,20 +189,22 @@ export default function WeightPage() {
     trendKg: trend[i],
   }))
 
-  const latest = weight[weight.length - 1]
-  const first = weight[0]
+  const latest = filteredWeight[filteredWeight.length - 1]
+  const first = filteredWeight[0]
   const minW = Math.min(...values)
   const maxW = Math.max(...values)
 
-  const prev30 = findClosestPast(weight, latest.date, 30)
-  const prev90 = findClosestPast(weight, latest.date, 90)
+  const prev30 = findClosestPast(filteredWeight, latest.date, 30)
+  const prev90 = findClosestPast(filteredWeight, latest.date, 90)
   const delta30 = prev30 ? latest.weightKg - prev30.weightKg : null
   const delta90 = prev90 ? latest.weightKg - prev90.weightKg : null
 
   const yMin = Math.floor((Math.min(...values, ...trend) - 1) * 2) / 2
   const yMax = Math.ceil((Math.max(...values, ...trend) + 1) * 2) / 2
 
-  const lastEntryWithBodyFat = [...weight].reverse().find(e => e.bodyFatPct != null)
+  const lastEntryWithBodyFat = [...filteredWeight].reverse().find(e => e.bodyFatPct != null)
+
+  const recent = [...filteredWeight].reverse().slice(0, 20)
 
   return (
     <div className="flex-1 p-6 overflow-y-auto">
@@ -95,13 +212,61 @@ export default function WeightPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-100">Peso</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            {weight.length} mediciones · desde {fmtDate(first.date)} hasta {fmtDate(latest.date)}
+            {filteredWeight.length} mediciones · desde {fmtDate(first.date)} hasta {fmtDate(latest.date)}
           </p>
         </div>
         <div className="text-right">
           <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Último registro</div>
           <div className="text-3xl font-black text-primary">{fmtKg(latest.weightKg)}</div>
           <div className="text-xs text-slate-500">{fmtDate(latest.date)}</div>
+        </div>
+      </div>
+
+      <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 mb-6">
+        <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">Filtrar por fechas</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+          <label className="text-xs text-slate-400">
+            Desde
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              min={weight[0]?.date}
+              max={weight[weight.length - 1]?.date}
+              className="mt-1 w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-200"
+            />
+          </label>
+          <label className="text-xs text-slate-400">
+            Hasta
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              min={weight[0]?.date}
+              max={weight[weight.length - 1]?.date}
+              className="mt-1 w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-200"
+            />
+          </label>
+          <div className="sm:col-span-2 flex flex-col items-start gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                setFromDate('')
+                setToDate('')
+              }}
+              disabled={!hasActiveFilter}
+              title={hasActiveFilter ? 'Quitar rango de fechas aplicado' : 'No hay filtro aplicado'}
+              className={`text-xs font-medium underline underline-offset-4 decoration-transparent transition-colors ${hasActiveFilter
+                ? 'text-primary hover:decoration-current'
+                : 'text-slate-500 cursor-not-allowed'
+              }`}
+            >
+              Restablecer fechas
+            </button>
+            {activeRangeLabel && (
+              <div className="text-xs text-slate-500 text-left">{activeRangeLabel}</div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -173,6 +338,62 @@ export default function WeightPage() {
         </div>
       </div>
 
+      {compositionSeries.length > 0 && (
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 mb-6">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-4">Evolución de composición corporal</div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {compositionSeries.map((metric) => (
+              <div key={metric.key} className="bg-slate-900/50 border border-slate-700/40 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-medium" style={{ color: metric.color }}>{metric.label}</div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold text-slate-100">
+                      {metric.latestValue != null ? metric.fmt(metric.latestValue) : '–'}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      {metric.latestDate ? fmtDate(metric.latestDate) : ''}
+                    </div>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={120}>
+                  <LineChart data={metric.points} margin={{ top: 4, right: 6, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                    <XAxis dataKey="d" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} interval={Math.max(Math.floor(metric.points.length / 6), 1)} />
+                    <YAxis yAxisId="metric" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} width={32} domain={['auto', 'auto']} />
+                    <YAxis yAxisId="weight" hide domain={[yMin, yMax]} />
+                    <Tooltip
+                      cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                      content={({ active, payload }) => {
+                        if (!active || !payload || payload.length === 0) return null
+                        const row = payload[0]?.payload as { date?: string; value?: number; weightKg?: number } | undefined
+                        return (
+                          <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: '6px 10px', fontSize: 11 }}>
+                            <div style={{ color: '#64748b', marginBottom: 4 }}>{row?.date ? fmtDate(row.date) : ''}</div>
+                            <div style={{ color: metric.color, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                              <span>{metric.label}</span>
+                              <span>{row?.value != null ? metric.fmt(row.value) : '–'}</span>
+                            </div>
+                            <div style={{ color: '#94a3b8', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                              <span>Peso</span>
+                              <span>{row?.weightKg != null ? fmtKg(row.weightKg) : '–'}</span>
+                            </div>
+                          </div>
+                        )
+                      }}
+                    />
+                    <Line yAxisId="weight" type="monotone" dataKey="weightKg" stroke="var(--color-primary)" strokeWidth={1.2} dot={false} strokeDasharray="4 3" opacity={0.6} />
+                    <Line yAxisId="metric" type="monotone" dataKey="value" stroke={metric.color} strokeWidth={2} dot={false} connectNulls />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 text-xs text-slate-500">
+            En cada grafica: linea solida = metrica corporal, linea punteada = peso total.
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
           <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">Composición corporal</div>
@@ -189,7 +410,7 @@ export default function WeightPage() {
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
           <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">Últimos registros (delta vs medida anterior)</div>
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-            {[...weight].reverse().slice(0, 20).map((e, idx, arr) => {
+            {recent.map((e, idx, arr) => {
               const prev = arr[idx + 1]
               const delta = prev ? round1(round1(e.weightKg) - round1(prev.weightKg)) : null
               const deltaColor = delta == null ? 'text-slate-500' : delta <= 0 ? 'text-green-400' : 'text-amber-400'
