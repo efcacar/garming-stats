@@ -491,6 +491,248 @@ def _fetch_sleep_data(api, output_dir: Path, days_initial: int = 90) -> list:
     return sorted(existing.values(), key=lambda x: x["date"])
 
 
+def _to_float(value):
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_weight_kg(value) -> float | None:
+    f = _to_float(value)
+    if f is None or f <= 0:
+        return None
+
+    if 20 <= f <= 250:
+        return round(f, 2)
+
+    if f > 250:
+        for div in (1000, 100, 10):
+            cand = f / div
+            if 20 <= cand <= 250:
+                return round(cand, 2)
+    return None
+
+
+def _to_iso_date(value) -> str | None:
+    import datetime as _dt
+    import re as _re
+
+    if value is None:
+        return None
+
+    if isinstance(value, (int, float)):
+        ts = float(value)
+        if ts > 10_000_000_000:
+            ts = ts / 1000
+        try:
+            return _dt.datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+        except Exception:
+            return None
+
+    s = str(value).strip()
+    if not s:
+        return None
+
+    m = _re.match(r"^(\d{4}-\d{2}-\d{2})", s)
+    if m:
+        return m.group(1)
+
+    try:
+        return _dt.datetime.fromisoformat(s.replace("Z", "+00:00")).strftime("%Y-%m-%d")
+    except Exception:
+        return None
+
+
+def _pick_number(d: dict, keys: list[str]) -> float | None:
+    for k in keys:
+        if k not in d:
+            continue
+        v = d.get(k)
+        if isinstance(v, dict):
+            for sub in ("value", "weight", "kg", "kgs", "amount"):
+                if sub in v:
+                    f = _to_float(v.get(sub))
+                    if f is not None:
+                        return f
+        else:
+            f = _to_float(v)
+            if f is not None:
+                return f
+    return None
+
+
+def _extract_weight_entries(raw) -> list[dict]:
+    """Extract daily weight entries from Garmin weight/body payloads."""
+    if not isinstance(raw, (dict, list)):
+        return []
+
+    out: dict[str, dict] = {}
+
+    def walk(node):
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+            return
+        if not isinstance(node, dict):
+            return
+
+        date = (
+            _to_iso_date(node.get("calendarDate"))
+            or _to_iso_date(node.get("date"))
+            or _to_iso_date(node.get("measurementDate"))
+            or _to_iso_date(node.get("startDate"))
+            or _to_iso_date(node.get("day"))
+            or _to_iso_date(node.get("dateTimestamp"))
+            or _to_iso_date(node.get("measurementTimeGMT"))
+        )
+
+        weight_kg = _normalize_weight_kg(_pick_number(node, [
+            "weight", "weightInKg", "weightKg", "bodyWeight", "mass",
+        ]))
+
+        if date and weight_kg is not None:
+            timestamp = _to_float(
+                node.get("measurementTimeGMT")
+                or node.get("dateTimestamp")
+                or node.get("calendarDateTime")
+            )
+            if timestamp is not None and timestamp < 10_000_000_000:
+                timestamp = timestamp * 1000
+
+            entry = {
+                "date": date,
+                "weightKg": weight_kg,
+                "bmi": _to_float(node.get("bmi")),
+                "bodyFatPct": _to_float(node.get("bodyFat")),
+                "muscleMassKg": _normalize_weight_kg(_pick_number(node, ["muscleMass", "muscleMassInKg"])),
+                "bodyWaterPct": _to_float(node.get("bodyWater")),
+                "boneMassKg": _normalize_weight_kg(_pick_number(node, ["boneMass", "boneMassInKg"])),
+                "visceralFat": _to_float(node.get("visceralFat")),
+                "metabolicAge": _to_float(node.get("metabolicAge")),
+                "timestamp": int(timestamp) if timestamp else None,
+            }
+
+            prev = out.get(date)
+            prev_ts = prev.get("timestamp") if prev else None
+            curr_ts = entry.get("timestamp")
+            if prev is None or (curr_ts is not None and (prev_ts is None or curr_ts >= prev_ts)):
+                out[date] = entry
+
+        for v in node.values():
+            if isinstance(v, (dict, list)):
+                walk(v)
+
+    walk(raw)
+    return sorted(out.values(), key=lambda x: x["date"])
+
+
+def _merge_weight_entries(existing_by_date: dict[str, dict], new_entries: list[dict]):
+    for entry in new_entries:
+        date = entry.get("date")
+        if not date:
+            continue
+        prev = existing_by_date.get(date)
+        if not prev:
+            existing_by_date[date] = entry
+            continue
+
+        prev_ts = prev.get("timestamp")
+        curr_ts = entry.get("timestamp")
+        if curr_ts is not None and (prev_ts is None or curr_ts >= prev_ts):
+            merged = {**prev, **entry}
+        else:
+            merged = {**entry, **prev}
+
+        for k, v in merged.items():
+            if v is None and prev.get(k) is not None:
+                merged[k] = prev[k]
+        existing_by_date[date] = merged
+
+
+def _fetch_weight_data(api, output_dir: Path, days_initial: int = 365) -> list:
+    """Fetch weight/body composition incrementally."""
+    import datetime as _dt
+
+    weight_path = output_dir / "weight.json"
+
+    existing: dict[str, dict] = {}
+    if weight_path.exists():
+        try:
+            for entry in json.loads(weight_path.read_text(encoding="utf-8")):
+                if isinstance(entry, dict) and entry.get("date"):
+                    existing[entry["date"]] = entry
+        except Exception:
+            pass
+
+    today = _dt.date.today()
+    if existing:
+        latest_cached = max(existing.keys())
+        start = _dt.date.fromisoformat(latest_cached) + _dt.timedelta(days=1)
+        print(f"  Incremental weight sync from {start} (already have {len(existing)} days)")
+    else:
+        start = today - _dt.timedelta(days=days_initial - 1)
+        # Try full backfill using Garmin's oldest available weigh-in.
+        try:
+            first_raw = api.get_first_weight() or {}
+            first_entries = _extract_weight_entries(first_raw)
+            if first_entries:
+                first_date = _dt.date.fromisoformat(first_entries[0]["date"])
+                if first_date < start:
+                    start = first_date
+        except Exception:
+            pass
+        print(f"  Initial weight sync from {start}")
+
+    if start > today:
+        return sorted(existing.values(), key=lambda x: x["date"])
+
+    start_s = start.isoformat()
+    end_s = today.isoformat()
+    total_new = 0
+
+    payloads = []
+    for method_name, args in [
+        ("get_weight_snapshot", [start_s, end_s]),
+        ("get_weigh_ins", [start_s, end_s]),
+        ("get_body_composition", [start_s, end_s]),
+    ]:
+        method = getattr(api, method_name, None)
+        if not method:
+            continue
+        try:
+            payloads.append(method(*args) or {})
+            time.sleep(0.2)
+        except Exception as e:
+            print(f"  WARNING: {method_name} failed: {e}")
+
+    for raw in payloads:
+        entries = _extract_weight_entries(raw)
+        before = len(existing)
+        _merge_weight_entries(existing, entries)
+        total_new += max(0, len(existing) - before)
+
+    if not existing:
+        cur = start
+        while cur <= today:
+            date_s = cur.isoformat()
+            try:
+                raw = api.get_daily_weigh_ins(date_s) or {}
+                entries = _extract_weight_entries(raw)
+                before = len(existing)
+                _merge_weight_entries(existing, entries)
+                total_new += max(0, len(existing) - before)
+                time.sleep(0.15)
+            except Exception:
+                pass
+            cur += _dt.timedelta(days=1)
+
+    print(f"  Fetched {total_new} new weight entries")
+    return sorted(existing.values(), key=lambda x: x["date"])
+
+
 def main():
     parser = argparse.ArgumentParser(description="Sync Garmin activities to local JSON")
     parser.add_argument("--limit", type=int, default=None, help="Max activities to sync (for testing)")
@@ -690,6 +932,12 @@ def main():
     gear_items = _fetch_gear_data(api)
     save_json(output_dir / "gear.json", gear_items)
     print(f"  Saved {len(gear_items)} gear items -> public/data/gear.json")
+
+    # Step 9: Fetch weight/body composition data incrementally
+    print("Fetching weight data (incremental)...")
+    weight_entries = _fetch_weight_data(api, output_dir)
+    save_json(output_dir / "weight.json", weight_entries)
+    print(f"  Saved {len(weight_entries)} weight entries -> public/data/weight.json")
 
     print("Run 'npm run dev' to open the app.")
 

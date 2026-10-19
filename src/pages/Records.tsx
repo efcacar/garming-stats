@@ -121,8 +121,8 @@ export default function Records() {
       <p className="text-sm text-slate-500 mb-6">Datos directamente de Garmin Connect</p>
 
       {!records ? (
-        <div className="text-center py-16 text-slate-500 text-sm">
-          No hay datos de récords. Ejecuta <code className="text-slate-400">python3 fetch/sync.py</code> para sincronizar.
+            <div className="text-center py-16 text-slate-500 text-sm">
+              No hay datos de récords. Ejecuta <code className="text-slate-400">source .venv/bin/activate && python fetch/sync.py</code> para sincronizar.
         </div>
       ) : (
         <div className="space-y-4">

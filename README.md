@@ -84,6 +84,7 @@ python fetch/sync.py --limit N
 
 - Inicia sesión en Garmin Connect con tu `.env`
 - Descarga la lista de actividades y los detalles de cada una
+- Descarga también sueño, equipo y peso/composición corporal
 - Guarda todo en `public/data/` (archivos JSON)
 
 La primera vez puede tardar **varios minutos** si tienes muchas actividades. Verás el progreso en la terminal.
@@ -218,7 +219,7 @@ garmin-stats/
 ├── fetch/
 │   ├── sync.py          ← Script que descarga datos de Garmin
 │   └── requirements.txt ← Dependencias de Python
-├── public/data/         ← Datos descargados (JSON)
+├── public/data/         ← Datos descargados (JSON: actividades, sueño, equipo, peso...)
 └── src/                 ← Código de la app web (React)
 ```
 

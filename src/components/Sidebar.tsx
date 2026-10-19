@@ -15,6 +15,7 @@ const NAV = [
   { to: '/fitness',     label: 'Fitness & Forma', icon: s('M22 12h-4l-3 9L9 3l-3 9H2') },
   { to: '/zones',       label: 'Zonas',           icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px] shrink-0"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>) },
   { to: '/sleep',       label: 'Sueño',           icon: s('M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z') },
+  { to: '/weight',      label: 'Peso',            icon: s('M7 21h10a2 2 0 002-2v-7a2 2 0 00-2-2h-1V7a4 4 0 10-8 0v3H7a2 2 0 00-2 2v7a2 2 0 002 2z M10 10V7a2 2 0 114 0v3') },
   { to: '/performance', label: 'Rendimiento',     icon: s('M13 2L3 14h9l-1 8 10-12h-9l1-8z') },
   { to: '/records',     label: 'Récords',         icon: s('M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z') },
   { to: '/gear',        label: 'Equipo',           icon: s('M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0 0h18') },
@@ -33,6 +34,8 @@ export default function Sidebar({ open, onClose }: Props) {
   const loadStats = useActivityStore(s => s.loadStats)
   const loadRecords = useActivityStore(s => s.loadRecords)
   const loadSleep = useActivityStore(s => s.loadSleep)
+  const loadGear = useActivityStore(s => s.loadGear)
+  const loadWeight = useActivityStore(s => s.loadWeight)
   const location = useLocation()
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -63,7 +66,7 @@ export default function Sidebar({ open, onClose }: Props) {
       const res = await fetch('/api/sync', { method: 'POST' })
       const json = await res.json()
       if (!res.ok) throw new Error(json.log || json.error || 'Error')
-      await Promise.all([loadActivities(), loadStats(), loadRecords(), loadSleep()])
+      await Promise.all([loadActivities(), loadStats(), loadRecords(), loadSleep(), loadGear(), loadWeight()])
       finishProgress(true)
     } catch (e) {
       setSyncError((e as Error).message.slice(0, 80))

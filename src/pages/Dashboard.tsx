@@ -33,8 +33,9 @@ function EmptyScreen() {
         <h2 className="text-amber-300 font-medium text-lg mb-2">Sin datos de Garmin</h2>
         <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm text-slate-300 space-y-1 mt-3">
           <div>cp .env.example .env</div>
-          <div>cd fetch && pip install -r requirements.txt</div>
-          <div>python3 sync.py --limit 20</div>
+          <div>python3 -m venv .venv && source .venv/bin/activate</div>
+          <div>python -m pip install -r fetch/requirements.txt</div>
+          <div>python fetch/sync.py --limit 20</div>
         </div>
       </div>
     </div>

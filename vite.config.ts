@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 
 export default defineConfig({
   server: {
@@ -19,6 +19,8 @@ export default defineConfig({
       name: 'garmin-sync-api',
       configureServer(server) {
         const settingsPath = resolve(__dirname, 'public/data/settings.json')
+        const venvPython = resolve(__dirname, '.venv/bin/python')
+        const pythonCmd = process.env.GARMIN_PYTHON ?? (existsSync(venvPython) ? venvPython : 'python3')
 
         // GET /api/settings — read settings file
         server.middlewares.use('/api/settings', (req, res) => {
@@ -58,7 +60,7 @@ export default defineConfig({
           const scriptPath = resolve(__dirname, 'fetch/sync.py')
           let proc
           try {
-            proc = spawn(process.env.GARMIN_PYTHON ?? 'python3', [scriptPath], {
+            proc = spawn(pythonCmd, [scriptPath], {
               cwd: resolve(__dirname),
               env: { ...process.env },
             })
@@ -95,7 +97,7 @@ export default defineConfig({
           const scriptPath = resolve(__dirname, 'fetch/import_settings.py')
           let proc
           try {
-            proc = spawn(process.env.GARMIN_PYTHON ?? 'python3', [scriptPath], {
+            proc = spawn(pythonCmd, [scriptPath], {
               cwd: resolve(__dirname),
               env: { ...process.env },
             })

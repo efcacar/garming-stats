@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ActivitySummary, ActivityDetail, GlobalStats, UserSettings, GarminRecords, SleepEntry, GearItem } from '../types/garmin'
+import type { ActivitySummary, ActivityDetail, GlobalStats, UserSettings, GarminRecords, SleepEntry, GearItem, WeightEntry } from '../types/garmin'
 import { DEFAULT_SETTINGS } from '../types/garmin'
 
 function getSystemTheme(): 'dark' | 'light' {
@@ -40,6 +40,7 @@ interface ActivityState {
   records: GarminRecords | null
   sleep: SleepEntry[]
   gear: GearItem[]
+  weight: WeightEntry[]
   settings: UserSettings
   loading: boolean
   error: string | null
@@ -50,6 +51,7 @@ interface ActivityState {
   loadRecords: () => Promise<void>
   loadSleep: () => Promise<void>
   loadGear: () => Promise<void>
+  loadWeight: () => Promise<void>
   loadSettings: () => Promise<void>
   updateSettings: (s: Partial<UserSettings>) => void
   loadDetail: (id: number) => Promise<ActivityDetail | null>
@@ -62,6 +64,7 @@ export const useActivityStore = create<ActivityState>()(
       records: null,
       sleep: [],
       gear: [],
+      weight: [],
       settings: DEFAULT_SETTINGS,
       loading: false,
       error: null,
@@ -110,6 +113,18 @@ export const useActivityStore = create<ActivityState>()(
           set({ sleep: data })
         } catch {
           // sleep is optional
+        }
+      },
+
+      loadWeight: async () => {
+        try {
+          const res = await fetch('/data/weight.json')
+          if (!res.ok) return
+          const data: WeightEntry[] = await res.json()
+          data.sort((a, b) => a.date.localeCompare(b.date))
+          set({ weight: data })
+        } catch {
+          // weight is optional
         }
       },
 

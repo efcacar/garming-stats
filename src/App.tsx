@@ -13,6 +13,7 @@ import PerformanceAnalysis from './pages/PerformanceAnalysis'
 import SleepPage from './pages/Sleep'
 import StatsPage from './pages/Stats'
 import GearPage from './pages/Gear'
+import WeightPage from './pages/Weight'
 
 export default function App() {
   const loadActivities = useActivityStore(s => s.loadActivities)
@@ -21,6 +22,7 @@ export default function App() {
   const loadRecords = useActivityStore(s => s.loadRecords)
   const loadSleep = useActivityStore(s => s.loadSleep)
   const loadGear = useActivityStore(s => s.loadGear)
+  const loadWeight = useActivityStore(s => s.loadWeight)
   const stats = useActivityStore(s => s.stats)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -31,7 +33,8 @@ export default function App() {
     loadRecords()
     loadSleep()
     loadGear()
-  }, [loadActivities, loadStats, loadSettings, loadRecords, loadSleep, loadGear])
+    loadWeight()
+  }, [loadActivities, loadStats, loadSettings, loadRecords, loadSleep, loadGear, loadWeight])
 
   // Auto-sync when last sync date is not today
   useEffect(() => {
@@ -45,11 +48,11 @@ export default function App() {
       .then(r => r.json())
       .then(json => {
         if (json.ok) {
-          return Promise.all([loadActivities(), loadStats(), loadRecords(), loadSleep()])
+          return Promise.all([loadActivities(), loadStats(), loadRecords(), loadSleep(), loadGear(), loadWeight()])
         }
       })
       .catch(() => {/* silent fail */})
-  }, [stats?.syncedAt])
+  }, [stats?.syncedAt, loadActivities, loadStats, loadRecords, loadSleep, loadGear, loadWeight])
 
   return (
     <BrowserRouter>
@@ -83,6 +86,7 @@ export default function App() {
             <Route path="/records" element={<Records />} />
             <Route path="/gear" element={<GearPage />} />
             <Route path="/sleep" element={<SleepPage />} />
+            <Route path="/weight" element={<WeightPage />} />
             <Route path="/stats" element={<StatsPage />} />
             <Route path="/performance" element={<PerformanceAnalysis />} />
             <Route path="/settings" element={<Settings />} />

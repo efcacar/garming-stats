@@ -108,6 +108,19 @@ export interface SleepEntry {
   restingHR: number | null
 }
 
+export interface WeightEntry {
+  date: string
+  weightKg: number
+  bmi: number | null
+  bodyFatPct: number | null
+  muscleMassKg: number | null
+  bodyWaterPct: number | null
+  boneMassKg: number | null
+  visceralFat: number | null
+  metabolicAge: number | null
+  timestamp: number | null
+}
+
 export interface BestEffort {
   km: number
   label: string

@@ -118,7 +118,7 @@ export default function SleepPage() {
   if (sleep.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-        Sin datos de sueño. Ejecuta <code className="mx-1 text-slate-400">python3 fetch/sync.py</code> para sincronizar.
+        Sin datos de sueño. Ejecuta <code className="mx-1 text-slate-400">source .venv/bin/activate && python fetch/sync.py</code> para sincronizar.
       </div>
     )
   }
