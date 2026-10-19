@@ -19,6 +19,7 @@ function fmtTime(s: number) {
 
 const MONTHS_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const DAYS_ES   = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+const YEAR_COLORS = ['#60a5fa', '#fb923c', '#4ade80', '#c084fc', '#f87171', '#facc15', '#22d3ee', '#f472b6', '#a3e635', '#2dd4bf']
 
 // ─── Expandable chart card ─────────────────────────────────────────────────────
 function ExpandableCard({ title, legend, children, defaultHeight = 200 }: {
@@ -190,6 +191,10 @@ export default function StatsPage() {
     const ys = [...new Set(activities.map(a => a.startTime.slice(0, 4)))].sort().reverse()
     return ys
   }, [activities])
+  const yearColorMap = useMemo(() => new Map(
+    [...years].reverse().map((year, index) => [year, YEAR_COLORS[index % YEAR_COLORS.length]])
+  ), [years])
+  const yearColor = (year: string) => yearColorMap.get(year) ?? YEAR_COLORS[0]
   const [calYear, setCalYear] = useState<number>(() => new Date().getFullYear())
 
   const filtered = useMemo(() =>
@@ -301,7 +306,15 @@ export default function StatsPage() {
   }, [filtered])
 
   // ── Year-over-year monthly comparison ──
-  const YEAR_COLORS = ['var(--color-primary)','#f97316','#22c55e','#a855f7','#f59e0b','#ec4899']
+  const renderYearSelector = (selectorYears: string[]) => (
+    <div className="flex flex-wrap justify-end gap-x-3 gap-y-1">
+      {selectorYears.map(year => (
+        <button key={year} onClick={() => toggleYear(year)} className={`flex items-center gap-1 text-xs transition-opacity select-none ${hiddenYears.has(year) ? 'opacity-30 line-through' : 'text-slate-400 hover:text-slate-200'}`}>
+          <span className="w-2 h-2 rounded-full inline-block" style={{ background: yearColor(year) }} />{year}
+        </button>
+      ))}
+    </div>
+  )
 
   const { chartYears, monthlyByYear } = useMemo(() => {
     type Row = Record<string, number | string | null>
@@ -342,17 +355,47 @@ export default function StatsPage() {
     return { chartYears, monthlyByYear }
   }, [filtered])
 
-  // ── Cumulative distance current year ──
-  const cumulativeYear = useMemo(() => {
-    const year = new Date().getFullYear()
-    const acts = filtered
-      .filter(a => a.startTime.startsWith(String(year)))
-      .sort((a, b) => a.startTime.localeCompare(b.startTime))
-    let cum = 0
-    return acts.map(a => {
-      cum += a.distance
-      return { date: a.startTime.slice(5, 10), cum: +cum.toFixed(1) }
-    })
+  // ── Cumulative distance by year, aligned to the current year's latest activity ──
+  const cumulativeByYear = useMemo(() => {
+    const currentYear = String(new Date().getFullYear())
+    const currentYearActivities = filtered.filter(a => a.startTime.startsWith(currentYear))
+    if (!currentYearActivities.length) return { data: [], years: [] as string[], lastDate: '' }
+
+    const lastDate = currentYearActivities.reduce((latest, a) =>
+      a.startTime.slice(5, 10) > latest ? a.startTime.slice(5, 10) : latest,
+      '01-01',
+    )
+    const years = [...new Set(filtered.map(a => a.startTime.slice(0, 4)))]
+      .filter(year => year <= currentYear)
+      .sort()
+    const dailyDistance: Record<string, Record<string, number>> = {}
+
+    for (const year of years) {
+      dailyDistance[year] = {}
+      for (const a of filtered) {
+        if (a.startTime.startsWith(year)) {
+          const date = a.startTime.slice(5, 10)
+          dailyDistance[year][date] = (dailyDistance[year][date] ?? 0) + a.distance
+        }
+      }
+    }
+
+    const data: Array<Record<string, number | string>> = []
+    let date = new Date(Date.UTC(Number(currentYear), 0, 1))
+    const yearEnd = new Date(Date.UTC(Number(currentYear) + 1, 0, 1))
+    let cumulativeByYear: Record<string, number> = Object.fromEntries(years.map(year => [year, 0]))
+    while (date < yearEnd) {
+      const dateKey = date.toISOString().slice(5, 10)
+      const row: Record<string, number | string> = { date: dateKey }
+      for (const year of years) {
+        cumulativeByYear[year] += dailyDistance[year][dateKey] ?? 0
+        row[`cum_${year}`] = +cumulativeByYear[year].toFixed(1)
+      }
+      data.push(row)
+      date.setUTCDate(date.getUTCDate() + 1)
+    }
+
+    return { data, years, lastDate }
   }, [filtered])
 
   // ── Top 10 activities by distance ──
@@ -392,10 +435,11 @@ export default function StatsPage() {
     }))
   }, [filtered])
 
-  const TOOLTIP_STYLE = { background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }
+  const TOOLTIP_STYLE = { background: '#1e293b', color: '#e2e8f0', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }
   const TOOLTIP_PROPS = {
     contentStyle: TOOLTIP_STYLE,
-    labelStyle: { color: '#64748b', marginBottom: 2 },
+    labelStyle: { color: '#cbd5e1', marginBottom: 2 },
+    itemStyle: { color: '#e2e8f0' },
     cursor: { fill: 'rgba(255,255,255,0.04)' },
   }
 
@@ -474,26 +518,26 @@ export default function StatsPage() {
 
         {/* Monthly dist + elev */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ExpandableCard title="Distancia mensual" legend={<div className="flex gap-3">{chartYears.map((y,i) => <span key={y} onClick={() => toggleYear(y)} className={`cursor-pointer flex items-center gap-1 text-xs transition-opacity select-none ${hiddenYears.has(y) ? 'opacity-30 line-through' : 'text-slate-400 hover:text-slate-200'}`}><span className="w-2 h-2 rounded-full inline-block" style={{background: YEAR_COLORS[i]}}/>{y}</span>)}</div>}>
+          <ExpandableCard title="Distancia mensual" legend={renderYearSelector(chartYears)}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monthlyByYear} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                   <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={35} unit=" km" />
                   <Tooltip {...TOOLTIP_PROPS} formatter={(v: unknown, name: string) => [`${v} km`, name.replace('dist_','')]} />
-                  {chartYears.map((y,i) => <Line key={y} type="monotone" dataKey={`dist_${y}`} stroke={YEAR_COLORS[i]} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
+                  {chartYears.map(y => <Line key={y} type="monotone" dataKey={`dist_${y}`} stroke={yearColor(y)} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
                 </LineChart>
               </ResponsiveContainer>
             </ExpandableCard>
 
-          <ExpandableCard title="Desnivel mensual" legend={<div className="flex gap-3">{chartYears.map((y,i) => <span key={y} onClick={() => toggleYear(y)} className={`cursor-pointer flex items-center gap-1 text-xs transition-opacity select-none ${hiddenYears.has(y) ? 'opacity-30 line-through' : 'text-slate-400 hover:text-slate-200'}`}><span className="w-2 h-2 rounded-full inline-block" style={{background: YEAR_COLORS[i]}}/>{y}</span>)}</div>}>
+          <ExpandableCard title="Desnivel mensual" legend={renderYearSelector(chartYears)}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monthlyByYear} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                   <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={40} unit=" m" />
                   <Tooltip {...TOOLTIP_PROPS} formatter={(v: unknown, name: string) => [`${v} m`, name.replace('elev_','')]} />
-                  {chartYears.map((y,i) => <Line key={y} type="monotone" dataKey={`elev_${y}`} stroke={YEAR_COLORS[i]} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
+                  {chartYears.map(y => <Line key={y} type="monotone" dataKey={`elev_${y}`} stroke={yearColor(y)} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
                 </LineChart>
               </ResponsiveContainer>
             </ExpandableCard>
@@ -501,26 +545,26 @@ export default function StatsPage() {
 
         {/* Monthly time + count */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ExpandableCard defaultHeight={180} title="Horas de entrenamiento mensual" legend={<div className="flex gap-3">{chartYears.map((y,i) => <span key={y} onClick={() => toggleYear(y)} className={`cursor-pointer flex items-center gap-1 text-xs transition-opacity select-none ${hiddenYears.has(y) ? 'opacity-30 line-through' : 'text-slate-400 hover:text-slate-200'}`}><span className="w-2 h-2 rounded-full inline-block" style={{background: YEAR_COLORS[i]}}/>{y}</span>)}</div>}>
+          <ExpandableCard defaultHeight={180} title="Horas de entrenamiento mensual" legend={renderYearSelector(chartYears)}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monthlyByYear} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                   <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={30} unit=" h" />
                   <Tooltip {...TOOLTIP_PROPS} formatter={(v: unknown, name: string) => [`${v} h`, name.replace('time_','')]} />
-                  {chartYears.map((y,i) => <Line key={y} type="monotone" dataKey={`time_${y}`} stroke={YEAR_COLORS[i]} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
+                  {chartYears.map(y => <Line key={y} type="monotone" dataKey={`time_${y}`} stroke={yearColor(y)} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
                 </LineChart>
               </ResponsiveContainer>
             </ExpandableCard>
 
-          <ExpandableCard defaultHeight={180} title="Actividades por mes" legend={<div className="flex gap-3">{chartYears.map((y,i) => <span key={y} onClick={() => toggleYear(y)} className={`cursor-pointer flex items-center gap-1 text-xs transition-opacity select-none ${hiddenYears.has(y) ? 'opacity-30 line-through' : 'text-slate-400 hover:text-slate-200'}`}><span className="w-2 h-2 rounded-full inline-block" style={{background: YEAR_COLORS[i]}}/>{y}</span>)}</div>}>
+          <ExpandableCard defaultHeight={180} title="Actividades por mes" legend={renderYearSelector(chartYears)}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monthlyByYear} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                   <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={28} />
                   <Tooltip {...TOOLTIP_PROPS} formatter={(v: unknown, name: string) => [v, name.replace('count_','')]} />
-                  {chartYears.map((y,i) => <Line key={y} type="monotone" dataKey={`count_${y}`} stroke={YEAR_COLORS[i]} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
+                  {chartYears.map(y => <Line key={y} type="monotone" dataKey={`count_${y}`} stroke={yearColor(y)} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
                 </LineChart>
               </ResponsiveContainer>
             </ExpandableCard>
@@ -536,7 +580,7 @@ export default function StatsPage() {
                 <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={40} unit=" km" />
                 <Tooltip {...TOOLTIP_PROPS} formatter={(v: unknown) => [`${v} km`, 'Distancia']} />
                 <Bar dataKey="dist" radius={[3, 3, 0, 0]}>
-                  {yearlyData.map((_, i) => <Cell key={i} fill={i === yearlyData.length - 1 ? 'var(--color-primary)' : '#6366f1'} />)}
+                  {yearlyData.map(({ year }) => <Cell key={year} fill={yearColor(year)} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -550,18 +594,22 @@ export default function StatsPage() {
                 <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={45} unit=" m" />
                 <Tooltip {...TOOLTIP_PROPS} formatter={(v: unknown) => [`${v} m`, 'Desnivel']} />
                 <Bar dataKey="elev" radius={[3, 3, 0, 0]}>
-                  {yearlyData.map((_, i) => <Cell key={i} fill={i === yearlyData.length - 1 ? '#f97316' : '#92400e'} />)}
+                  {yearlyData.map(({ year }) => <Cell key={year} fill={yearColor(year)} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </ExpandableCard>
         </div>
 
-        {/* Cumulative this year */}
-        {cumulativeYear.length > 1 && (
-          <ExpandableCard defaultHeight={160} title={`Distancia acumulada ${new Date().getFullYear()} · ${cumulativeYear.at(-1)?.cum?.toFixed(0)} km`}>
+        {/* Cumulative distance by year */}
+        {cumulativeByYear.data.length > 1 && (
+          <ExpandableCard
+            defaultHeight={160}
+            title={`Distancia acumulada al ${cumulativeByYear.lastDate} · ${new Date().getFullYear()}: ${Number(cumulativeByYear.data.at(-1)?.[`cum_${new Date().getFullYear()}`] ?? 0).toFixed(0)} km`}
+            legend={renderYearSelector(cumulativeByYear.years)}
+          >
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={cumulativeYear} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                <AreaChart data={cumulativeByYear.data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <defs>
                     <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.3}/>
@@ -569,10 +617,13 @@ export default function StatsPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} interval={Math.floor(cumulativeYear.length / 6)} />
+                  <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} interval={Math.floor(cumulativeByYear.data.length / 6)} />
                   <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={40} unit=" km" />
-                  <Tooltip {...TOOLTIP_PROPS} formatter={(v: unknown) => [`${v} km`, 'Acumulado']} />
-                  <Area type="monotone" dataKey="cum" stroke="var(--color-primary)" strokeWidth={2} fill="url(#cumGrad)" dot={false} />
+                  <Tooltip {...TOOLTIP_PROPS} formatter={(value, name) => [`${value} km`, String(name ?? '')]} />
+                  {cumulativeByYear.years.map(year => {
+                    const color = yearColor(year)
+                    return <Area key={year} type="monotone" dataKey={`cum_${year}`} name={year} stroke={color} strokeWidth={year === String(new Date().getFullYear()) ? 2 : 1.5} fill={year === String(new Date().getFullYear()) ? 'url(#cumGrad)' : 'none'} dot={false} hide={hiddenYears.has(year)} />
+                  })}
                 </AreaChart>
               </ResponsiveContainer>
           </ExpandableCard>
@@ -581,10 +632,7 @@ export default function StatsPage() {
         {/* Pace/speed trend + HR trend */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {monthlyByYear.some(m => chartYears.some(y => m[`pace_${y}`] != null)) && (
-            <ExpandableCard defaultHeight={160} title="Ritmo medio mensual · Running">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex gap-3">{chartYears.map((y,i) => <span key={y} onClick={() => toggleYear(y)} className={`cursor-pointer flex items-center gap-1 text-xs transition-opacity select-none ${hiddenYears.has(y) ? 'opacity-30 line-through' : 'text-slate-400 hover:text-slate-200'}`}><span className="w-2 h-2 rounded-full inline-block" style={{background: YEAR_COLORS[i]}}/>{y}</span>)}</div>
-              </div>
+            <ExpandableCard defaultHeight={160} title="Ritmo medio mensual · Running" legend={renderYearSelector(chartYears)}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monthlyByYear} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
@@ -594,39 +642,33 @@ export default function StatsPage() {
                     const n = Number(v); const m = Math.floor(n); const s = Math.round((n-m)*60)
                     return [`${m}:${String(s).padStart(2,'0')} /km`, name.replace('pace_','')]
                   }} />
-                  {chartYears.map((y,i) => <Line key={y} type="monotone" dataKey={`pace_${y}`} stroke={YEAR_COLORS[i]} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
+                  {chartYears.map(y => <Line key={y} type="monotone" dataKey={`pace_${y}`} stroke={yearColor(y)} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
                 </LineChart>
               </ResponsiveContainer>
             </ExpandableCard>
           )}
           {monthlyByYear.some(m => chartYears.some(y => m[`speed_${y}`] != null)) && (
-            <ExpandableCard defaultHeight={160} title="Velocidad media mensual · Ciclismo">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex gap-3">{chartYears.map((y,i) => <span key={y} onClick={() => toggleYear(y)} className={`cursor-pointer flex items-center gap-1 text-xs transition-opacity select-none ${hiddenYears.has(y) ? 'opacity-30 line-through' : 'text-slate-400 hover:text-slate-200'}`}><span className="w-2 h-2 rounded-full inline-block" style={{background: YEAR_COLORS[i]}}/>{y}</span>)}</div>
-              </div>
+            <ExpandableCard defaultHeight={160} title="Velocidad media mensual · Ciclismo" legend={renderYearSelector(chartYears)}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monthlyByYear} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                   <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={32} domain={['auto','auto']} />
                   <Tooltip {...TOOLTIP_PROPS} formatter={(v: unknown, name: string) => [`${v} km/h`, name.replace('speed_','')]} />
-                  {chartYears.map((y,i) => <Line key={y} type="monotone" dataKey={`speed_${y}`} stroke={YEAR_COLORS[i]} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
+                  {chartYears.map(y => <Line key={y} type="monotone" dataKey={`speed_${y}`} stroke={yearColor(y)} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
                 </LineChart>
               </ResponsiveContainer>
             </ExpandableCard>
           )}
           {monthlyByYear.some(m => chartYears.some(y => m[`hr_${y}`] != null)) && (
-            <ExpandableCard defaultHeight={160} title="FC media mensual">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex gap-3">{chartYears.map((y,i) => <span key={y} onClick={() => toggleYear(y)} className={`cursor-pointer flex items-center gap-1 text-xs transition-opacity select-none ${hiddenYears.has(y) ? 'opacity-30 line-through' : 'text-slate-400 hover:text-slate-200'}`}><span className="w-2 h-2 rounded-full inline-block" style={{background: YEAR_COLORS[i]}}/>{y}</span>)}</div>
-              </div>
+            <ExpandableCard defaultHeight={160} title="FC media mensual" legend={renderYearSelector(chartYears)}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monthlyByYear} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                   <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={32} domain={['auto','auto']} unit=" bpm" />
                   <Tooltip {...TOOLTIP_PROPS} formatter={(v: unknown, name: string) => [`${v} bpm`, name.replace('hr_','')]} />
-                  {chartYears.map((y,i) => <Line key={y} type="monotone" dataKey={`hr_${y}`} stroke={YEAR_COLORS[i]} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
+                  {chartYears.map(y => <Line key={y} type="monotone" dataKey={`hr_${y}`} stroke={yearColor(y)} strokeWidth={2} dot={false} connectNulls hide={hiddenYears.has(y)} />)}
                 </LineChart>
               </ResponsiveContainer>
             </ExpandableCard>
