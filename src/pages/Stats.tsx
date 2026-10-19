@@ -497,7 +497,7 @@ export default function StatsPage() {
           title="Actividad por día"
           legend={
             <div className="flex bg-slate-900 rounded-lg p-0.5 gap-0.5">
-              {years.slice(0, 5).map(y => (
+              {years.slice(0, 5).reverse().map(y => (
                 <button key={y} onClick={() => setCalYear(Number(y))}
                   className={`px-2.5 py-1 rounded-md text-xs transition-colors ${calYear === Number(y) ? 'bg-primary text-white' : 'text-slate-400 hover:text-slate-200'}`}>
                   {y}
