@@ -57,17 +57,17 @@ La app necesita tu email y contraseña de Garmin Connect para descargar tus acti
 
 ---
 
-### 3. Instalar dependencias de Python (sincronización)
+### 3. Crear entorno virtual e instalar dependencias de Python (sincronización)
 
-Entra en la carpeta `fetch` e instala las librerías necesarias:
+Desde la carpeta raíz del proyecto, crea un entorno virtual y instala las librerías ahí:
 
 ```bash
-cd fetch
-python3 -m pip install -r requirements.txt
-cd ..
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r fetch/requirements.txt
 ```
 
-> Si `pip` no funciona, prueba con `python3 -m pip install -r requirements.txt` desde la carpeta `fetch`.
+> En macOS con Python de Homebrew, esto evita el error de entorno gestionado externamente (PEP 668).
 
 ---
 
@@ -76,7 +76,8 @@ cd ..
 Desde la carpeta raíz del proyecto (`garmin-stats`):
 
 ```bash
-python3 fetch/sync.py --limit N
+source .venv/bin/activate
+python fetch/sync.py --limit N
 ```
 
 **Qué hace este comando:**
@@ -91,16 +92,16 @@ La primera vez puede tardar **varios minutos** si tienes muchas actividades. Ver
 
 ```bash
 # Solo las 20 actividades más recientes (para probar)
-python3 fetch/sync.py --limit 20
+python fetch/sync.py --limit 20
 
 # Solo actividades desde una fecha
-python3 fetch/sync.py --since 2024-01-01
+python fetch/sync.py --since 2024-01-01
 
 # Más rápido, sin descargar rutas GPS
-python3 fetch/sync.py --no-gpx
+python fetch/sync.py --no-gpx
 ```
 
-> **Importante:** vuelve a ejecutar `python3 fetch/sync.py` cuando quieras actualizar los datos con entrenamientos nuevos. Las actividades ya descargadas no se vuelven a pedir a Garmin.
+> **Importante:** vuelve a ejecutar `python fetch/sync.py` cuando quieras actualizar los datos con entrenamientos nuevos. Las actividades ya descargadas no se vuelven a pedir a Garmin.
 
 ---
 
@@ -140,7 +141,8 @@ Cada vez que quieras usar la app con datos actualizados:
 
 ```bash
 # 1. Sincronizar datos nuevos de Garmin
-python3 fetch/sync.py
+source .venv/bin/activate
+python fetch/sync.py
 
 # 2. Arrancar la app
 npm run dev
@@ -178,7 +180,8 @@ No existe el archivo `.env` o está vacío. Repite el **paso 2**.
 Aún no has sincronizado datos. Ejecuta primero:
 
 ```bash
-python3 fetch/sync.py
+source .venv/bin/activate
+python fetch/sync.py
 ```
 
 ### La terminal dice que `node` o `npm` no existen
