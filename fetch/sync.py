@@ -106,6 +106,22 @@ def fetch_activity_details(api, activity_id: int) -> dict:
     return result or {}
 
 
+def restore_summary_temperatures(summaries: list, output_dir: Path):
+    for summary in summaries:
+        detail_path = output_dir / f"activity_{summary['id']}.json"
+        if not detail_path.exists():
+            continue
+        try:
+            cached = json.loads(detail_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            print(f"  WARNING: Could not restore temperature for {summary['id']}: {error}")
+            continue
+        if cached.get("avgTemperature") is not None:
+            summary["avgTemperature"] = cached["avgTemperature"]
+        if cached.get("temperatureSynced"):
+            summary["temperatureSynced"] = True
+
+
 def fetch_activity_temperature(api, activity_id: int) -> dict | None:
     raw = _try(api.get_activity, activity_id, label=f"temperature {activity_id}")
     if raw is None:
@@ -830,6 +846,7 @@ def main():
             print(f"  WARNING: Failed to normalize activity {raw.get('activityId')}: {e}")
 
     # Save summary list immediately so the app can start loading
+    restore_summary_temperatures(summaries, output_dir)
     save_json(output_dir / "activities.json", summaries)
     print(f"Saved {len(summaries)} activity summaries -> public/data/activities.json")
 
@@ -846,6 +863,7 @@ def main():
             if temperature is not None:
                 cached.update(temperature)
                 summary.update(temperature)
+                save_json(output_dir / "activities.json", summaries)
                 if detail_path.exists():
                     save_json(detail_path, cached)
             time.sleep(0.3)

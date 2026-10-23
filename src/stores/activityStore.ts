@@ -73,7 +73,7 @@ export const useActivityStore = create<ActivityState>()(
       loadActivities: async () => {
         set({ loading: true, error: null })
         try {
-          const res = await fetch('/data/activities.json')
+          const res = await fetch('/data/activities.json', { cache: 'no-store' })
           if (!res.ok) throw new Error(`No se encontró /data/activities.json (status ${res.status})`)
           const data: ActivitySummary[] = await res.json()
           data.sort((a, b) => b.startTime.localeCompare(a.startTime))
