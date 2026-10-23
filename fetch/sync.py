@@ -199,12 +199,6 @@ def _needs_gpx_backfill(detail_path: Path) -> bool:
         return False
     try:
         cached = json.loads(detail_path.read_text(encoding="utf-8"))
-        if "workoutBlocks" not in cached:
-            blocks = fetch_workout_blocks(api, activity_id)
-            if blocks is not None:
-                cached["workoutBlocks"] = blocks
-                save_json(detail_path, cached)
-            time.sleep(0.3)
     except Exception:
         return False
 
@@ -834,6 +828,16 @@ def main():
 
         if detail_path.exists() and not args.force:
             cached = json.loads(detail_path.read_text(encoding="utf-8"))
+            if "samples" not in cached:
+                details = fetch_activity_details(api, activity_id)
+                if isinstance(details.get("activityDetailMetrics"), list):
+                    from normalizer import normalize_activity_samples
+                    cached["samples"] = normalize_activity_samples(details)
+                    save_json(detail_path, cached)
+                time.sleep(0.3)
+            if "avgTemperature" not in cached or summary.get("avgTemperature") is not None:
+                cached["avgTemperature"] = summary.get("avgTemperature")
+                save_json(detail_path, cached)
             if any("intensityType" not in lap for lap in cached.get("laps", [])):
                 splits = fetch_activity_splits(api, activity_id)
                 if isinstance(splits.get("lapDTOs"), list) or isinstance(splits.get("splits"), list):

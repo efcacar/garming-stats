@@ -38,6 +38,7 @@ export interface ActivitySummary {
   maxElevation: number | null
   avgHR: number
   maxHR: number
+  avgTemperature?: number | null // degrees Celsius
   calories: number
   tss: number | null
   avgPace: number | null    // sec/km (running/swim)
@@ -53,7 +54,19 @@ export interface ActivitySummary {
   avgStrokesPerLength?: number | null
 }
 
+export interface ActivitySample {
+  time: number // elapsed seconds
+  distance: number | null // km
+  elevation: number | null
+  pace: number | null // seconds/km
+  heartRate: number | null
+  power: number | null
+  latitude: number | null
+  longitude: number | null
+}
+
 export interface ActivityDetail extends ActivitySummary {
+  samples?: ActivitySample[]
   workoutBlocks?: WorkoutBlock[]
   gear?: GearItem[]
   laps: Lap[]

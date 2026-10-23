@@ -120,6 +120,7 @@ def normalize_summary(activity: dict) -> dict:
         ) or None,
         "avgHR": round(_safe(activity, "averageHR") or 0),
         "maxHR": round(_safe(activity, "maxHR") or 0),
+        "avgTemperature": _safe(activity, "averageTemperature"),
         "calories": round(_safe(activity, "calories") or 0),
         "tss": _safe(activity, "trainingStressScore"),
         "avgPace": avg_pace,  # sec/km, running/swim only
@@ -141,6 +142,39 @@ def normalize_summary(activity: dict) -> dict:
     return summary
 
 
+def normalize_activity_samples(details: dict) -> list:
+    import math
+
+    indexes = {item["key"]: item["metricsIndex"] for item in details.get("metricDescriptors", [])}
+
+    def value(metrics, key):
+        index = indexes.get(key)
+        if index is None or index >= len(metrics):
+            return None
+        result = metrics[index]
+        return result if isinstance(result, (int, float)) and math.isfinite(result) else None
+
+    samples = []
+    for row in details.get("activityDetailMetrics", []):
+        metrics = row.get("metrics", [])
+        elapsed = value(metrics, "sumElapsedDuration")
+        if elapsed is None:
+            continue
+        speed = value(metrics, "directSpeed")
+        distance = value(metrics, "sumDistance")
+        samples.append({
+            "time": elapsed,
+            "distance": distance / 1000 if distance is not None else None,
+            "elevation": value(metrics, "directElevation"),
+            "pace": 1000 / speed if speed is not None and speed > 0 else None,
+            "heartRate": value(metrics, "directHeartRate"),
+            "power": value(metrics, "directPower"),
+            "latitude": value(metrics, "directLatitude"),
+            "longitude": value(metrics, "directLongitude"),
+        })
+    return sorted(samples, key=lambda sample: sample["time"])
+
+
 def normalize_workout_blocks(raw: dict) -> list:
     blocks = []
     for split in raw.get("splits", []):
@@ -160,6 +194,7 @@ def normalize_workout_blocks(raw: dict) -> list:
 def normalize_detail(summary: dict, details: dict, hr_zones_raw: list, splits_raw: dict, gpx_coords: list) -> dict:
     """Merges summary + activity details + HR zones + splits + GPS into the full ActivityDetail."""
     detail = dict(summary)
+    detail["samples"] = normalize_activity_samples(details)
 
     # Laps from splits endpoint (garminconnect 0.2.x)
     # get_activity_splits returns {"lapDTOs": [...]} or {"splits": [...]}
@@ -179,6 +214,8 @@ def normalize_detail(summary: dict, details: dict, hr_zones_raw: list, splits_ra
 
     # Extra metrics from the details summaryDTO if present
     metrics = _safe(details, "summaryDTO") or {}
+    if detail.get("avgTemperature") is None:
+        detail["avgTemperature"] = _safe(metrics, "averageTemperature")
     if metrics:
         detail["avgStrideLength"] = _safe(metrics, "avgStrideLength")
         detail["trainingEffect"] = _safe(metrics, "trainingEffect")

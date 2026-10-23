@@ -6,6 +6,7 @@ import { formatPace, formatDuration, formatDistance, formatDate, sportLabel } fr
 import { HR_ZONE_DEFS } from '../utils/calculations'
 import ActivityMap from '../components/ActivityMap'
 import ElevationChart from '../components/ElevationChart'
+import ActivityCharts from '../components/ActivityCharts'
 import MetricCard from '../components/MetricCard'
 import GearCard from '../components/GearCard'
 
@@ -19,10 +20,13 @@ export default function ActivityDetailPage() {
   const [detail, setDetail] = useState<ActivityDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+  const [hoveredSample, setHoveredSample] = useState<number | null>(null)
 
   useEffect(() => {
     if (!id) return
     setLoading(true)
+    setHoveredSample(null)
+    setHoveredIdx(null)
     loadDetail(Number(id)).then(d => {
       setDetail(d)
       setLoading(false)
@@ -40,6 +44,7 @@ export default function ActivityDetailPage() {
   }
 
   const act = detail ?? summary
+  const sample = hoveredSample != null ? detail?.samples?.[hoveredSample] : undefined
   if (!act) {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
@@ -53,7 +58,6 @@ export default function ActivityDetailPage() {
     <div className="flex-1 p-6 overflow-y-auto">
       {/* Header */}
       <div className="mb-5">
-        <Link to="/activities" className="text-xs text-slate-500 hover:text-slate-300 mb-2 inline-block">← Actividades</Link>
         <h1 className="text-xl font-bold text-slate-100">{act.title}</h1>
         <div className="text-sm text-slate-500 mt-0.5">
           {formatDate(act.startTime)} · {sportLabel(act.sport)}
@@ -75,6 +79,7 @@ export default function ActivityDetailPage() {
         <MetricCard compact label="Elevación +" value={act.elevationGain} unit="m" />
         <MetricCard compact label="Descenso" value={act.elevationLoss} unit="m" />
         <MetricCard compact label="Altitud máx." value={act.maxElevation ?? '–'} unit={act.maxElevation != null ? 'm' : ''} />
+        <MetricCard compact label="Temperatura media" value={act.avgTemperature != null ? act.avgTemperature.toLocaleString('es-ES', { maximumFractionDigits: 1 }) : '–'} unit={act.avgTemperature != null ? '°C' : ''} />
         {act.tss != null && <MetricCard compact label="TSS" value={Math.round(act.tss)} />}
         {act.sport === 'cycling' && act.avgPower
           ? <MetricCard compact label="Potencia media" value={act.avgPower} unit="W" />
@@ -89,13 +94,18 @@ export default function ActivityDetailPage() {
       {/* Map */}
       {detail?.gpxCoords && detail.gpxCoords.length > 0 && (
         <div className="mb-3">
-          <ActivityMap coords={detail.gpxCoords} sport={act.sport} height={320} hoveredIdx={hoveredIdx} />
+          <ActivityMap coords={detail.gpxCoords} sport={act.sport} height={320} hoveredIdx={hoveredIdx} hoveredPosition={sample?.latitude != null && sample.longitude != null ? [sample.latitude, sample.longitude] : null} />
         </div>
       )}
 
       {/* Elevation chart */}
-      {detail?.gpxCoords && detail.gpxCoords.length > 0 && (
+      {detail?.samples && detail.samples.length > 0 ? (
+        <ActivityCharts samples={detail.samples} hoveredIndex={hoveredSample} onHover={setHoveredSample} />
+      ) : detail?.gpxCoords && detail.gpxCoords.length > 0 && (
         <ElevationChart coords={detail.gpxCoords} onHover={setHoveredIdx} />
+      )}
+      {detail && !detail.samples && (
+        <p className="text-xs text-slate-500 mb-4">Sincroniza para cargar las gráficas de ritmo, frecuencia cardíaca y potencia.</p>
       )}
 
       <section className="mb-6">

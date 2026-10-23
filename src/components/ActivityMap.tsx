@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import * as L from 'leaflet'
 
 interface Props {
   coords: number[][]
   sport?: string
   height?: number
   hoveredIdx?: number | null
+  hoveredPosition?: [number, number] | null
 }
 
 const TILE_LAYERS = {
@@ -57,17 +59,16 @@ function pulseMarkerHtml(color: string, label: string) {
   `
 }
 
-export default function ActivityMap({ coords, sport = 'other', height = 320, hoveredIdx }: Props) {
+export default function ActivityMap({ coords, sport = 'other', height = 320, hoveredIdx, hoveredPosition }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<any>(null)
-  const hoverMarkerRef = useRef<any>(null)
-  const tileLayerRef = useRef<any>(null)
+  const mapRef = useRef<L.Map | null>(null)
+  const hoverMarkerRef = useRef<L.CircleMarker | null>(null)
+  const tileLayerRef = useRef<L.TileLayer | null>(null)
   const [tileStyle, setTileStyle] = useState<keyof typeof TILE_LAYERS>('terrain')
 
   useEffect(() => {
     if (!containerRef.current || coords.length === 0) return
 
-    import('leaflet').then((L) => {
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
 
       const map = L.map(containerRef.current!, {
@@ -77,7 +78,7 @@ export default function ActivityMap({ coords, sport = 'other', height = 320, hov
         dragging: true,
       })
 
-      const tile = L.tileLayer(TILE_LAYERS[tileStyle].url, {
+      const tile = L.tileLayer(TILE_LAYERS.terrain.url, {
         maxZoom: 17,
       }).addTo(map)
       tileLayerRef.current = tile
@@ -92,7 +93,7 @@ export default function ActivityMap({ coords, sport = 'other', height = 320, hov
       L.polyline(latLngs, { color, weight: 2.5, opacity: 1 }).addTo(map)
 
       map.fitBounds(L.polyline(latLngs).getBounds(), { padding: [28, 28] })
-      setTimeout(() => map.invalidateSize(), 0)
+      const resizeTimer = setTimeout(() => map.invalidateSize(), 0)
 
       // Styled start/end markers
       if (latLngs.length > 0) {
@@ -109,9 +110,11 @@ export default function ActivityMap({ coords, sport = 'other', height = 320, hov
       L.control.zoom({ position: 'bottomright' }).addTo(map)
 
       mapRef.current = map
-    })
 
     return () => {
+      clearTimeout(resizeTimer)
+      hoverMarkerRef.current = null
+      tileLayerRef.current = null
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
     }
   }, [coords, sport])
@@ -119,32 +122,28 @@ export default function ActivityMap({ coords, sport = 'other', height = 320, hov
   // Switch tile layer when style changes
   useEffect(() => {
     if (!mapRef.current || !tileLayerRef.current) return
-    import('leaflet').then((L) => {
-      if (!mapRef.current) return
       mapRef.current.removeLayer(tileLayerRef.current)
       tileLayerRef.current = L.tileLayer(TILE_LAYERS[tileStyle].url, { maxZoom: 17 })
       tileLayerRef.current.addTo(mapRef.current)
       tileLayerRef.current.bringToBack()
-    })
-  }, [tileStyle])
+  }, [tileStyle, coords, sport])
 
   useEffect(() => {
-    if (!mapRef.current || hoveredIdx == null || hoveredIdx < 0 || hoveredIdx >= coords.length) {
+    const position = hoveredPosition ?? (hoveredIdx != null && hoveredIdx >= 0 && hoveredIdx < coords.length ? coords[hoveredIdx] : null)
+    if (!mapRef.current || !position || !Number.isFinite(position[0]) || !Number.isFinite(position[1])) {
       if (hoverMarkerRef.current) { hoverMarkerRef.current.remove(); hoverMarkerRef.current = null }
       return
     }
-    import('leaflet').then((L) => {
-      if (!mapRef.current) return
-      const [lat, lng] = coords[hoveredIdx]
+      const [lat, lng] = position
       if (hoverMarkerRef.current) {
         hoverMarkerRef.current.setLatLng([lat, lng])
       } else {
         hoverMarkerRef.current = L.circleMarker([lat, lng], {
           radius: 7, color: '#ffffff', fillColor: 'var(--color-primary)', fillOpacity: 1, weight: 2,
+          interactive: false,
         }).addTo(mapRef.current)
       }
-    })
-  }, [hoveredIdx, coords])
+  }, [hoveredIdx, hoveredPosition, coords, sport])
 
   if (coords.length === 0) {
     return (
@@ -208,4 +207,3 @@ export default function ActivityMap({ coords, sport = 'other', height = 320, hov
     </div>
   )
 }
-
