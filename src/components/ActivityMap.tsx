@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import * as L from 'leaflet'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
 
 interface Props {
   coords: number[][]
@@ -9,201 +9,147 @@ interface Props {
   hoveredPosition?: [number, number] | null
 }
 
-const TILE_LAYERS = {
-  terrain: {
-    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-    label: '⛰️',
-    title: 'Relieve',
-  },
-  dark: {
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    label: '🌑',
-    title: 'Oscuro',
-  },
-  satellite: {
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    label: '🛰️',
-    title: 'Satélite',
-  },
-}
+const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim()
+if (API_KEY) setOptions({ key: API_KEY, v: 'quarterly', language: 'es', region: 'ES' })
 
 const SPORT_COLORS: Record<string, string> = {
-  running:  '#ef4444',
-  cycling:  '#f97316',
+  running: '#ef4444',
+  cycling: '#f97316',
   swimming: '#3b82f6',
-  walking:  '#22c55e',
-  other:    '#8b5cf6',
+  walking: '#22c55e',
+  other: '#8b5cf6',
 }
 
-function pulseMarkerHtml(color: string, label: string) {
-  return `
-    <div style="position:relative;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">
-      <div style="
-        position:absolute;width:20px;height:20px;border-radius:50%;
-        background:${color};opacity:0.25;
-        animation:map-pulse 1.8s ease-out infinite;
-      "></div>
-      <div style="
-        width:10px;height:10px;border-radius:50%;
-        background:${color};border:2px solid #fff;
-        box-shadow:0 0 6px ${color}99;
-        position:relative;z-index:1;
-      "></div>
-      <div style="
-        position:absolute;top:-18px;left:50%;transform:translateX(-50%);
-        font-size:9px;font-weight:700;color:${color};
-        text-shadow:0 1px 2px rgba(0,0,0,0.8);letter-spacing:0.5px;
-        white-space:nowrap;
-      ">${label}</div>
-    </div>
-  `
+function validPosition(position: number[] | null | undefined): position is number[] {
+  return !!position && Number.isFinite(position[0]) && Number.isFinite(position[1])
+    && Math.abs(position[0]) <= 90 && Math.abs(position[1]) <= 180
 }
 
 export default function ActivityMap({ coords, sport = 'other', height = 320, hoveredIdx, hoveredPosition }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<L.Map | null>(null)
-  const hoverMarkerRef = useRef<L.CircleMarker | null>(null)
-  const tileLayerRef = useRef<L.TileLayer | null>(null)
-  const [tileStyle, setTileStyle] = useState<keyof typeof TILE_LAYERS>('terrain')
+  const mapRef = useRef<google.maps.Map | null>(null)
+  const hoverMarkerRef = useRef<google.maps.Marker | null>(null)
+  const [ready, setReady] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const path = useMemo(() => coords.filter(validPosition).map(point => ({ lat: point[0], lng: point[1] })), [coords])
+  const hasRoute = path.length > 0
 
   useEffect(() => {
-    if (!containerRef.current || coords.length === 0) return
-
-      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
-
-      const map = L.map(containerRef.current!, {
-        zoomControl: false,
-        scrollWheelZoom: false,
-        attributionControl: false,
-        dragging: true,
-      })
-
-      const tile = L.tileLayer(TILE_LAYERS.terrain.url, {
-        maxZoom: 17,
-      }).addTo(map)
-      tileLayerRef.current = tile
-
-      const latLngs: [number, number][] = coords.map(c => [c[0], c[1]])
-      const color = SPORT_COLORS[sport] ?? '#8b5cf6'
-
-      // Glow effect: wide semi-transparent line underneath
-      L.polyline(latLngs, { color, weight: 10, opacity: 0.15 }).addTo(map)
-      L.polyline(latLngs, { color, weight: 5,  opacity: 0.35 }).addTo(map)
-      // Sharp line on top
-      L.polyline(latLngs, { color, weight: 2.5, opacity: 1 }).addTo(map)
-
-      map.fitBounds(L.polyline(latLngs).getBounds(), { padding: [28, 28] })
-      const resizeTimer = setTimeout(() => map.invalidateSize(), 0)
-
-      // Styled start/end markers
-      if (latLngs.length > 0) {
-        const iconOpts = { iconSize: [24, 24] as [number, number], iconAnchor: [12, 12] as [number, number], className: '' }
-        L.marker(latLngs[0], {
-          icon: L.divIcon({ ...iconOpts, html: pulseMarkerHtml('#22c55e', 'START') }),
-        }).addTo(map)
-        L.marker(latLngs[latLngs.length - 1], {
-          icon: L.divIcon({ ...iconOpts, html: pulseMarkerHtml('#ef4444', 'END') }),
-        }).addTo(map)
+    if (!API_KEY || !hasRoute || !containerRef.current) return
+    let cancelled = false
+    let timedOut = false
+    const container = containerRef.current
+    const previousAuthFailure = window.gm_authFailure
+    window.gm_authFailure = () => {
+      if (!cancelled) {
+        console.error('Google Maps authentication failed. Check API key restrictions, enabled API and billing.')
+        setError('Google Maps ha rechazado la clave. Comprueba Maps JavaScript API, la facturación y los sitios web autorizados en Google Cloud.')
       }
+      previousAuthFailure?.()
+    }
+    const timeout = setTimeout(() => {
+      timedOut = true
+      if (!cancelled) setError('Google Maps está tardando demasiado en cargar. Comprueba tu conexión y recarga la página.')
+    }, 20000)
 
-      // Zoom control (custom position)
-      L.control.zoom({ position: 'bottomright' }).addTo(map)
-
-      mapRef.current = map
+    Promise.all([importLibrary('maps'), importLibrary('marker')]).then(([{ Map }]) => {
+      if (cancelled) return
+      clearTimeout(timeout)
+      if (timedOut) setError(null)
+      mapRef.current = new Map(container, {
+        center: { lat: 0, lng: 0 },
+        zoom: 12,
+        mapTypeId: 'roadmap',
+        mapTypeControl: true,
+        mapTypeControlOptions: { mapTypeIds: ['roadmap', 'hybrid', 'terrain'] },
+        streetViewControl: false,
+        fullscreenControl: true,
+        scrollwheel: false,
+      })
+      setReady(true)
+    }).catch(() => {
+      if (cancelled) return
+      clearTimeout(timeout)
+      console.error('Google Maps JavaScript API could not be loaded.')
+      setError('No se pudo cargar Google Maps. Comprueba tu conexión, los bloqueadores del navegador y la configuración de la API.')
+    })
 
     return () => {
-      clearTimeout(resizeTimer)
+      cancelled = true
+      clearTimeout(timeout)
+      window.gm_authFailure = previousAuthFailure
+      if (mapRef.current) google.maps.event.clearInstanceListeners(mapRef.current)
+      hoverMarkerRef.current?.setMap(null)
       hoverMarkerRef.current = null
-      tileLayerRef.current = null
-      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
+      mapRef.current = null
+      container.replaceChildren()
+      setReady(false)
     }
-  }, [coords, sport])
-
-  // Switch tile layer when style changes
-  useEffect(() => {
-    if (!mapRef.current || !tileLayerRef.current) return
-      mapRef.current.removeLayer(tileLayerRef.current)
-      tileLayerRef.current = L.tileLayer(TILE_LAYERS[tileStyle].url, { maxZoom: 17 })
-      tileLayerRef.current.addTo(mapRef.current)
-      tileLayerRef.current.bringToBack()
-  }, [tileStyle, coords, sport])
+  }, [hasRoute])
 
   useEffect(() => {
-    const position = hoveredPosition ?? (hoveredIdx != null && hoveredIdx >= 0 && hoveredIdx < coords.length ? coords[hoveredIdx] : null)
-    if (!mapRef.current || !position || !Number.isFinite(position[0]) || !Number.isFinite(position[1])) {
-      if (hoverMarkerRef.current) { hoverMarkerRef.current.remove(); hoverMarkerRef.current = null }
+    const map = mapRef.current
+    if (!ready || !map || !path.length) return
+    const color = SPORT_COLORS[sport] ?? SPORT_COLORS.other
+    const route = new google.maps.Polyline({
+      map, path, strokeColor: color, strokeOpacity: 1, strokeWeight: 4, clickable: false,
+    })
+    const bounds = new google.maps.LatLngBounds()
+    path.forEach(point => bounds.extend(point))
+    if (path.length === 1) {
+      map.setCenter(path[0])
+      map.setZoom(16)
+    } else {
+      map.fitBounds(bounds, 32)
+    }
+    // Symbol markers do not require a Google Cloud map ID.
+    const markers = [
+      { position: path[0], color: '#22c55e', title: 'Inicio' },
+      { position: path[path.length - 1], color: '#ef4444', title: 'Final' },
+    ].map(({ position, color: fillColor, title }) => new google.maps.Marker({
+      map, position, title, clickable: false,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 6, fillColor, fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2 },
+    }))
+    return () => {
+      route.setMap(null)
+      markers.forEach(marker => marker.setMap(null))
+    }
+  }, [ready, path, sport])
+
+  useEffect(() => {
+    const map = mapRef.current
+    const position = hoveredPosition ?? (hoveredIdx != null ? coords[hoveredIdx] : null)
+    if (!ready || !map || !validPosition(position)) {
+      hoverMarkerRef.current?.setMap(null)
       return
     }
-      const [lat, lng] = position
-      if (hoverMarkerRef.current) {
-        hoverMarkerRef.current.setLatLng([lat, lng])
-      } else {
-        hoverMarkerRef.current = L.circleMarker([lat, lng], {
-          radius: 7, color: '#ffffff', fillColor: 'var(--color-primary)', fillOpacity: 1, weight: 2,
-          interactive: false,
-        }).addTo(mapRef.current)
-      }
-  }, [hoveredIdx, hoveredPosition, coords, sport])
+    const point = { lat: position[0], lng: position[1] }
+    if (!hoverMarkerRef.current) {
+      const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim() || '#14b8a6'
+      hoverMarkerRef.current = new google.maps.Marker({
+        position: point, map, title: 'Posición del entrenamiento', clickable: false, zIndex: 10,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: primaryColor, fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2 },
+      })
+    } else {
+      hoverMarkerRef.current.setPosition(point)
+      hoverMarkerRef.current.setMap(map)
+    }
+  }, [ready, hoveredPosition, hoveredIdx, coords])
 
-  if (coords.length === 0) {
-    return (
-      <div className="rounded-xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-center text-slate-500 text-sm" style={{ height }}>
-        Sin datos GPS
-      </div>
-    )
-  }
+  const message = !hasRoute
+    ? 'Sin datos GPS'
+    : !API_KEY
+      ? 'Configura VITE_GOOGLE_MAPS_API_KEY en .env.local y reinicia el servidor para activar Google Maps.'
+      : error
 
   return (
-    <div style={{ height, position: 'relative' }} className="rounded-xl overflow-hidden border border-slate-700/50">
-      <style>{`
-        @keyframes map-pulse {
-          0%   { transform: scale(1); opacity: 0.25; }
-          70%  { transform: scale(2.5); opacity: 0; }
-          100% { transform: scale(1); opacity: 0; }
-        }
-        .leaflet-control-zoom {
-          border: none !important;
-          margin: 0 8px 8px 0 !important;
-        }
-        .leaflet-control-zoom a {
-          background: rgba(15,23,42,0.85) !important;
-          color: #94a3b8 !important;
-          border: 1px solid rgba(71,85,105,0.5) !important;
-          width: 28px !important;
-          height: 28px !important;
-          line-height: 28px !important;
-          font-size: 16px !important;
-        }
-        .leaflet-control-zoom a:hover {
-          background: rgba(30,41,59,0.95) !important;
-          color: #e2e8f0 !important;
-        }
-      `}</style>
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-      {/* Tile style toggle */}
-      <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 1000, display: 'flex', gap: 4 }}>
-        {(Object.entries(TILE_LAYERS) as [keyof typeof TILE_LAYERS, typeof TILE_LAYERS[keyof typeof TILE_LAYERS]][]).map(([key, { label, title }]) => (
-          <button
-            key={key}
-            title={title}
-            onClick={() => setTileStyle(key)}
-            style={{
-              background: tileStyle === key ? 'rgba(15,23,42,0.95)' : 'rgba(15,23,42,0.7)',
-              border: `1px solid ${tileStyle === key ? 'rgba(148,163,184,0.5)' : 'rgba(71,85,105,0.3)'}`,
-              borderRadius: 6,
-              width: 28,
-              height: 28,
-              cursor: 'pointer',
-              fontSize: 14,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+    <div style={{ height }} className="relative rounded-xl overflow-hidden border border-slate-700/50 bg-slate-800/60">
+      <div ref={containerRef} aria-label="Mapa del recorrido en Google Maps" className="h-full w-full" />
+      {(message || !ready) && (
+        <div role={error ? 'alert' : 'status'} className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-slate-400 bg-slate-900/95">
+          {message ?? 'Cargando Google Maps...'}
+        </div>
+      )}
     </div>
   )
 }

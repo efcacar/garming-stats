@@ -127,6 +127,23 @@ npm install
 
 Solo hace falta hacerlo **una vez** (o cuando cambien las dependencias del proyecto).
 
+### Configurar Google Maps
+
+El detalle de las actividades utiliza **Google Maps**, con mapa de calles, satélite con etiquetas y relieve. La ruta, los puntos de inicio/final y el seguimiento Play/Pausa se dibujan con las coordenadas de Garmin; no se consulta la API de rutas.
+
+1. En [Google Cloud Console](https://console.cloud.google.com/), crea o selecciona un proyecto, habilita la facturación y activa **Maps JavaScript API**.
+2. Crea una clave de API. Restríngela a **Sitios web (referentes HTTP)** con las direcciones que utilices, por ejemplo `http://localhost:5173/*` y `http://127.0.0.1:5173/*`. En producción, añade solo el dominio de la aplicación.
+3. En las restricciones de API, permite únicamente **Maps JavaScript API**. Configura cuotas y alertas de consumo en Google Cloud; las alertas de presupuesto no detienen los cargos.
+4. Crea `.env.local` en la raíz del proyecto con:
+
+   ```dotenv
+   VITE_GOOGLE_MAPS_API_KEY=tu_clave_de_google_maps
+   ```
+
+5. Reinicia `npm run dev`. Si publicas una compilación, configura la variable antes de compilar.
+
+La clave de Maps para navegador es visible en la aplicación: no es una credencial de Garmin ni una clave de servidor; protégela mediante las restricciones anteriores. No subas `.env.local` al repositorio. Al abrir un mapa se realizan solicitudes a Google, sujetas a sus condiciones, privacidad y tarifas de Maps JavaScript API. Sin clave se muestra un aviso de configuración; los errores de red o autorización se muestran en el mapa. No se cargan mapas de otro proveedor como alternativa.
+
 ---
 
 ### 6. Abrir la app
