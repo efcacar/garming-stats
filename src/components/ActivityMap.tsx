@@ -119,7 +119,7 @@ export default function ActivityMap({ coords, sport = 'other', height = 320, hov
   }
 
   return (
-    <div style={{ height }} className="relative rounded-xl overflow-hidden border border-slate-700/50">
+    <div style={{ height }} data-map-style={tileStyle} className="activity-map relative rounded-xl overflow-hidden border border-slate-700/50">
       <div ref={containerRef} aria-label="Mapa del recorrido" className="h-full w-full" />
       {((needsCartoKey && !CARTO_KEY) || tileError) && (
         <div role="alert" className="absolute bottom-8 left-3 right-3 z-[1000] rounded-lg bg-slate-900/95 p-3 text-center text-xs text-slate-300">

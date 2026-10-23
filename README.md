@@ -129,7 +129,7 @@ Solo hace falta hacerlo **una vez** (o cuando cambien las dependencias del proye
 
 ### Mapas del recorrido
 
-El detalle utiliza Leaflet con **CARTO Voyager (Calles) por defecto**, además de relieve de OpenTopoMap, mapa oscuro de CARTO y satélite de Esri. Las capas CARTO requieren una clave de **Basemaps**; Relieve y Satélite no utilizan esa clave. Las capas se descargan de sus proveedores y muestran sus atribuciones; su uso está sujeto a las condiciones y límites de cada proveedor.
+El detalle utiliza Leaflet con **CARTO Voyager (Calles) por defecto**, además de relieve de OpenTopoMap, mapa oscuro de CARTO y satélite de Esri. En el tema oscuro, el fondo de Calles se atenúa para reducir el deslumbramiento, sin alterar la ruta, los marcadores ni los controles. Las capas CARTO requieren una clave de **Basemaps**; Relieve y Satélite no utilizan esa clave. Las capas se descargan de sus proveedores y muestran sus atribuciones; su uso está sujeto a las condiciones y límites de cada proveedor.
 
 Obtén una clave en [CARTO Basemaps](https://carto.com/basemaps/apikey/), eligiendo el plan gratuito para proyectos personales según sus condiciones vigentes. Añade a `.env.local` en la raíz:
 

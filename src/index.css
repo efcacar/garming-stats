@@ -33,6 +33,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+html:not([data-theme="light"]) .activity-map[data-map-style="voyager"] .leaflet-tile-pane {
+  filter: brightness(0.78) saturate(0.85);
+}
+
 /* ── Dark theme: replace bluish slate with neutral zinc ──────────────────── */
 :root {
   --color-slate-950: #09090b;
