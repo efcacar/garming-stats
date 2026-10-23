@@ -106,6 +106,19 @@ def fetch_activity_details(api, activity_id: int) -> dict:
     return result or {}
 
 
+def fetch_activity_temperature(api, activity_id: int) -> dict | None:
+    raw = _try(api.get_activity, activity_id, label=f"temperature {activity_id}")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or not isinstance(raw.get("summaryDTO"), dict):
+        print(f"  WARNING: Unexpected activity summary for temperature {activity_id}")
+        return None
+    return {
+        "avgTemperature": raw["summaryDTO"].get("averageTemperature"),
+        "temperatureSynced": True,
+    }
+
+
 def fetch_activity_hr_zones(api, activity_id: int) -> list:
     """Fetch HR zone breakdown (seconds per zone) for a single activity."""
     result = _try(api.get_activity_hr_in_timezones, activity_id, label=f"hr_zones {activity_id}")
@@ -825,6 +838,17 @@ def main():
     for i, summary in enumerate(summaries):
         activity_id = summary["id"]
         detail_path = output_dir / f"activity_{activity_id}.json"
+        cached = json.loads(detail_path.read_text(encoding="utf-8")) if detail_path.exists() else {}
+        if cached.get("temperatureSynced") and not args.force:
+            summary["avgTemperature"] = cached.get("avgTemperature")
+        else:
+            temperature = fetch_activity_temperature(api, activity_id)
+            if temperature is not None:
+                cached.update(temperature)
+                summary.update(temperature)
+                if detail_path.exists():
+                    save_json(detail_path, cached)
+            time.sleep(0.3)
 
         if detail_path.exists() and not args.force:
             cached = json.loads(detail_path.read_text(encoding="utf-8"))
@@ -890,6 +914,8 @@ def main():
 
         # Rate limiting — critical to avoid Garmin banning the account
         time.sleep(0.5)
+
+    save_json(output_dir / "activities.json", summaries)
 
     # Step 4: Compute and save global stats
     stats = compute_stats(summaries)
