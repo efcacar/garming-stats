@@ -203,6 +203,7 @@ export default function WeightPage() {
   const yMax = Math.ceil((Math.max(...values, ...trend) + 1) * 2) / 2
 
   const lastEntryWithBodyFat = [...filteredWeight].reverse().find(e => e.bodyFatPct != null)
+  const lastEntryWithBoneMass = [...filteredWeight].reverse().find(e => e.boneMassKg != null)
 
   const recent = [...filteredWeight].reverse().slice(0, 20)
 
@@ -402,7 +403,7 @@ export default function WeightPage() {
             <Metric label="% Grasa" value={lastEntryWithBodyFat?.bodyFatPct != null ? `${lastEntryWithBodyFat.bodyFatPct.toFixed(1)}%` : '–'} />
             <Metric label="Masa muscular" value={latest.muscleMassKg != null ? fmtKg(latest.muscleMassKg) : '–'} />
             <Metric label="Agua corporal" value={latest.bodyWaterPct != null ? `${latest.bodyWaterPct.toFixed(1)}%` : '–'} />
-            <Metric label="Masa ósea" value={latest.boneMassKg != null ? fmtKg(latest.boneMassKg) : '–'} />
+            <Metric label="Masa ósea" value={lastEntryWithBoneMass?.boneMassKg != null ? fmtKg(lastEntryWithBoneMass.boneMassKg) : '–'} />
             <Metric label="Edad metabólica" value={latest.metabolicAge != null ? `${Math.round(latest.metabolicAge)}` : '–'} />
           </div>
         </div>

@@ -516,6 +516,23 @@ def _normalize_weight_kg(value) -> float | None:
     return None
 
 
+def _normalize_bone_mass_kg(value) -> float | None:
+    f = _to_float(value)
+    if f is None or f <= 0:
+        return None
+
+    if 1 <= f <= 15:
+        return round(f, 2)
+
+    if 15 < f <= 150:
+        return round(f / 10, 2)
+
+    if 1000 <= f <= 15_000:
+        return round(f / 1000, 2)
+
+    return None
+
+
 def _to_iso_date(value) -> str | None:
     import datetime as _dt
     import re as _re
@@ -609,7 +626,7 @@ def _extract_weight_entries(raw) -> list[dict]:
                 "bodyFatPct": _to_float(node.get("bodyFat")),
                 "muscleMassKg": _normalize_weight_kg(_pick_number(node, ["muscleMass", "muscleMassInKg"])),
                 "bodyWaterPct": _to_float(node.get("bodyWater")),
-                "boneMassKg": _normalize_weight_kg(_pick_number(node, ["boneMass", "boneMassInKg"])),
+                "boneMassKg": _normalize_bone_mass_kg(_pick_number(node, ["boneMass", "boneMassInKg"])),
                 "visceralFat": _to_float(node.get("visceralFat")),
                 "metabolicAge": _to_float(node.get("metabolicAge")),
                 "timestamp": int(timestamp) if timestamp else None,
@@ -647,8 +664,8 @@ def _merge_weight_entries(existing_by_date: dict[str, dict], new_entries: list[d
             merged = {**entry, **prev}
 
         for k, v in merged.items():
-            if v is None and prev.get(k) is not None:
-                merged[k] = prev[k]
+            if v is None:
+                merged[k] = prev.get(k) if prev.get(k) is not None else entry.get(k)
         existing_by_date[date] = merged
 
 
@@ -663,6 +680,11 @@ def _fetch_weight_data(api, output_dir: Path, days_initial: int = 365) -> list:
         try:
             for entry in json.loads(weight_path.read_text(encoding="utf-8")):
                 if isinstance(entry, dict) and entry.get("date"):
+                    bone_mass = _to_float(entry.get("boneMassKg"))
+                    if bone_mass is not None and 15 < bone_mass <= 150:
+                        entry["boneMassKg"] = round(bone_mass / 10, 2)
+                    elif bone_mass is not None and not 1 <= bone_mass <= 15:
+                        entry["boneMassKg"] = None
                     existing[entry["date"]] = entry
         except Exception:
             pass
@@ -670,8 +692,13 @@ def _fetch_weight_data(api, output_dir: Path, days_initial: int = 365) -> list:
     today = _dt.date.today()
     if existing:
         latest_cached = max(existing.keys())
-        start = _dt.date.fromisoformat(latest_cached) + _dt.timedelta(days=1)
-        print(f"  Incremental weight sync from {start} (already have {len(existing)} days)")
+        missing_bone_mass = any(entry.get("boneMassKg") is None for entry in existing.values())
+        if missing_bone_mass:
+            start = _dt.date.fromisoformat(min(existing.keys()))
+            print(f"  Backfilling weight composition from {start} (bone mass missing in cached data)")
+        else:
+            start = _dt.date.fromisoformat(latest_cached) + _dt.timedelta(days=1)
+            print(f"  Incremental weight sync from {start} (already have {len(existing)} days)")
     else:
         start = today - _dt.timedelta(days=days_initial - 1)
         # Try full backfill using Garmin's oldest available weigh-in.
