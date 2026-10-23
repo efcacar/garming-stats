@@ -1,3 +1,5 @@
+import { differenceInCalendarDays } from 'date-fns'
+
 export function startOfWeek(offsetWeeks = 0): Date {
   const d = new Date()
   const day = d.getDay()
@@ -20,7 +22,7 @@ export function monthKey(isoDate: string): string {
 }
 
 export function daysAgo(isoDate: string): number {
-  return Math.floor((Date.now() - new Date(isoDate).getTime()) / 86_400_000)
+  return differenceInCalendarDays(new Date(), new Date(isoDate))
 }
 
 export function isoToday(): string {

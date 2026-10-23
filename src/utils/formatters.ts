@@ -1,4 +1,5 @@
 import type { Sport } from '../types/garmin'
+import { daysAgo } from './date'
 
 export function gearTypeLabel(type: string): string {
   const labels: Record<string, string> = {
@@ -52,9 +53,7 @@ export function formatShortDate(isoString: string): string {
 }
 
 export function formatRelativeTime(isoString: string): string {
-  const now = new Date()
-  const d = new Date(isoString)
-  const days = Math.floor((now.getTime() - d.getTime()) / 86400000)
+  const days = daysAgo(isoString)
   if (days === 0) return 'Hoy'
   if (days === 1) return 'Ayer'
   if (days < 7) return `Hace ${days} días`
