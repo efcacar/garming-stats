@@ -108,10 +108,15 @@ export default function ActivityDetailPage() {
         <p className="text-xs text-slate-500 mb-4">Sincroniza para cargar las gráficas de ritmo, frecuencia cardíaca y potencia.</p>
       )}
 
-      <section className="mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4 items-start">
+        <div className="min-w-0">
+          {detail && <WorkoutBlocks blocks={detail.workoutBlocks} laps={detail.laps} sport={act.sport} />}
+        </div>
+        <div className="min-w-0 space-y-4">
+      <section>
         <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Material utilizado</h2>
         {detail?.gear && detail.gear.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             {detail.gear.map(item => (
               <GearCard key={item.uuid} item={gear.find(g => g.uuid === item.uuid) ?? item} />
             ))}
@@ -127,7 +132,7 @@ export default function ActivityDetailPage() {
 
       {/* HR Zones */}
       {detail?.hrZones && detail.hrZones.length > 0 && (
-        <section className="mb-6">
+        <section className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
           <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Zonas de frecuencia cardíaca</h2>
           <div className="space-y-2">
             {detail.hrZones.map((zone) => {
@@ -135,16 +140,16 @@ export default function ActivityDetailPage() {
               const pct = total > 0 ? (zone.seconds / total) * 100 : 0
               const def = HR_ZONE_DEFS[zone.zone - 1]
               return (
-                <div key={zone.zone} className="flex items-center gap-3">
-                  <div className="w-24 text-xs text-slate-400">{zone.name}</div>
-                  <div className="flex-1 bg-slate-800 rounded-full h-2">
+                <div key={zone.zone} className="flex items-center gap-2">
+                  <div className="w-14 shrink-0 text-xs text-slate-400">{zone.name}</div>
+                  <div className="flex-1 min-w-0 bg-slate-800 rounded-full h-2">
                     <div
                       className="h-2 rounded-full transition-all"
                       style={{ width: `${pct}%`, background: def?.color ?? '#6b7280' }}
                     />
                   </div>
-                  <div className="w-16 text-xs text-slate-400 text-right">{formatDuration(zone.seconds)}</div>
-                  <div className="w-10 text-xs text-slate-500 text-right">{pct.toFixed(0)}%</div>
+                  <div className="w-12 shrink-0 text-xs text-slate-400 text-right">{formatDuration(zone.seconds)}</div>
+                  <div className="w-8 shrink-0 text-xs text-slate-500 text-right">{pct.toFixed(0)}%</div>
                 </div>
               )
             })}
@@ -152,7 +157,8 @@ export default function ActivityDetailPage() {
         </section>
       )}
 
-      {detail && <WorkoutBlocks blocks={detail.workoutBlocks} laps={detail.laps} sport={act.sport} />}
+        </div>
+      </div>
     </div>
   )
 }

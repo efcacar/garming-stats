@@ -38,9 +38,6 @@ export default function WorkoutBlocks({ blocks, laps, sport }: {
       <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">
         Tramos de entrenamiento · {blocks.length}
       </h2>
-      <p className="text-xs text-slate-500 mb-3">
-        Bloques originales de Garmin. Despliega cada tramo para ver sus parciales por distancia; se conservan los tramos inferiores a un kilómetro.
-      </p>
       <div className="space-y-2">
         {blocks.map((block, index) => {
           const style = BLOCK_STYLES[block.type ?? '']
