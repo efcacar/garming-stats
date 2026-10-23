@@ -7,11 +7,13 @@ import { HR_ZONE_DEFS } from '../utils/calculations'
 import ActivityMap from '../components/ActivityMap'
 import ElevationChart from '../components/ElevationChart'
 import MetricCard from '../components/MetricCard'
+import GearCard from '../components/GearCard'
 
 export default function ActivityDetailPage() {
   const { id } = useParams<{ id: string }>()
   const loadDetail = useActivityStore(s => s.loadDetail)
   const activities = useActivityStore(s => s.activities)
+  const gear = useActivityStore(s => s.gear)
   const [detail, setDetail] = useState<ActivityDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
@@ -56,6 +58,32 @@ export default function ActivityDetailPage() {
         </div>
       </div>
 
+      {/* Key metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 gap-2 mb-3">
+        <MetricCard compact label="Distancia" value={formatDistance(act.distance, act.sport)} />
+        <MetricCard compact label="Duración" value={formatDuration(act.duration)} />
+        {act.sport === 'running' && act.avgPace
+          ? <MetricCard compact label="Ritmo medio" value={formatPace(act.avgPace)} />
+          : act.sport === 'cycling' && act.avgSpeed
+          ? <MetricCard compact label="Velocidad" value={`${act.avgSpeed}`} unit="km/h" />
+          : <MetricCard compact label="Calorías" value={act.calories} unit="kcal" />
+        }
+        <MetricCard compact label="FC Media" value={act.avgHR > 0 ? act.avgHR : '–'} unit={act.avgHR > 0 ? 'bpm' : ''} />
+        <MetricCard compact label="FC Máxima" value={act.maxHR > 0 ? act.maxHR : '–'} unit={act.maxHR > 0 ? 'bpm' : ''} />
+        <MetricCard compact label="Elevación +" value={act.elevationGain} unit="m" />
+        <MetricCard compact label="Descenso" value={act.elevationLoss} unit="m" />
+        <MetricCard compact label="Altitud máx." value={act.maxElevation ?? '–'} unit={act.maxElevation != null ? 'm' : ''} />
+        {act.tss != null && <MetricCard compact label="TSS" value={Math.round(act.tss)} />}
+        {act.sport === 'cycling' && act.avgPower
+          ? <MetricCard compact label="Potencia media" value={act.avgPower} unit="W" />
+          : act.sport === 'cycling' && act.normalizedPower
+          ? <MetricCard compact label="Potencia NP" value={act.normalizedPower} unit="W" />
+          : act.sport === 'running' && act.avgCadence
+          ? <MetricCard compact label="Cadencia" value={act.avgCadence} unit="spm" />
+          : null
+        }
+      </div>
+
       {/* Map */}
       {detail?.gpxCoords && detail.gpxCoords.length > 0 && (
         <div className="mb-3">
@@ -68,34 +96,22 @@ export default function ActivityDetailPage() {
         <ElevationChart coords={detail.gpxCoords} onHover={setHoveredIdx} />
       )}
 
-      {/* Key metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <MetricCard label="Distancia" value={formatDistance(act.distance, act.sport)} />
-        <MetricCard label="Duración" value={formatDuration(act.duration)} />
-        {act.sport === 'running' && act.avgPace
-          ? <MetricCard label="Ritmo medio" value={formatPace(act.avgPace)} />
-          : act.sport === 'cycling' && act.avgSpeed
-          ? <MetricCard label="Velocidad" value={`${act.avgSpeed}`} unit="km/h" />
-          : <MetricCard label="Calorías" value={act.calories} unit="kcal" />
-        }
-        <MetricCard label="FC Media" value={act.avgHR > 0 ? act.avgHR : '–'} unit={act.avgHR > 0 ? 'bpm' : ''} />
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-        <MetricCard label="FC Máxima" value={act.maxHR > 0 ? act.maxHR : '–'} unit={act.maxHR > 0 ? 'bpm' : ''} />
-        <MetricCard label="Elevación +" value={act.elevationGain} unit="m" />
-        <MetricCard label="Descenso" value={act.elevationLoss} unit="m" />
-        <MetricCard label="Altitud máx." value={act.maxElevation ?? '–'} unit={act.maxElevation != null ? 'm' : ''} />
-        {act.tss != null && <MetricCard label="TSS" value={Math.round(act.tss)} />}
-        {act.sport === 'cycling' && act.avgPower
-          ? <MetricCard label="Potencia media" value={act.avgPower} unit="W" />
-          : act.sport === 'cycling' && act.normalizedPower
-          ? <MetricCard label="Potencia NP" value={act.normalizedPower} unit="W" />
-          : act.sport === 'running' && act.avgCadence
-          ? <MetricCard label="Cadencia" value={act.avgCadence} unit="spm" />
-          : null
-        }
-      </div>
+      <section className="mb-6">
+        <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Material utilizado</h2>
+        {detail?.gear && detail.gear.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {detail.gear.map(item => (
+              <GearCard key={item.uuid} item={gear.find(g => g.uuid === item.uuid) ?? item} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">
+            {detail?.gear
+              ? 'Esta actividad no tiene material asociado en Garmin Connect.'
+              : 'Material pendiente de sincronizar. Vuelve a sincronizar para cargar el equipo de esta actividad.'}
+          </p>
+        )}
+      </section>
 
       {/* HR Zones */}
       {detail?.hrZones && detail.hrZones.length > 0 && (

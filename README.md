@@ -85,6 +85,7 @@ python fetch/sync.py --limit N
 - Inicia sesión en Garmin Connect con tu `.env`
 - Descarga la lista de actividades y los detalles de cada una
 - Descarga también sueño, equipo y peso/composición corporal
+- Guarda el material asociado a cada actividad para mostrarlo en su detalle, con las estadísticas acumuladas del equipo y su vida útil cuando estén disponibles.
 - Guarda todo en `public/data/` (archivos JSON)
 
 La primera vez puede tardar **varios minutos** si tienes muchas actividades. Verás el progreso en la terminal.
@@ -102,7 +103,7 @@ python fetch/sync.py --since 2024-01-01
 python fetch/sync.py --no-gpx
 ```
 
-> **Importante:** vuelve a ejecutar `python fetch/sync.py` cuando quieras actualizar los datos con entrenamientos nuevos. Las actividades ya descargadas no se vuelven a pedir a Garmin.
+> **Importante:** vuelve a ejecutar `python fetch/sync.py` cuando quieras actualizar los datos con entrenamientos nuevos. Las actividades ya descargadas no se vuelven a pedir a Garmin, salvo para completar datos pendientes como el material asociado. Para actualizar asociaciones de material modificadas en Garmin, utiliza `--force` (puedes combinarlo con `--limit 20`).
 
 ---
 
@@ -259,4 +260,3 @@ git rm --cached .env
 ```
 
 Luego haz commit de la eliminación. Si ya los subiste a GitHub, **cambia tu contraseña de Garmin** y considera borrar el historial del repositorio.
-

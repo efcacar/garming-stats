@@ -48,6 +48,7 @@ export interface ActivitySummary {
 }
 
 export interface ActivityDetail extends ActivitySummary {
+  gear?: GearItem[]
   laps: Lap[]
   hrZones: HRZone[]
   gpxCoords: number[][]  // [lat, lon] or [lat, lon, ele] pairs

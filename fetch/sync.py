@@ -375,6 +375,32 @@ def _compute_cycling_best_efforts(output_dir: Path) -> list:
     return sorted(bests.values(), key=lambda x: x["km"])
 
 
+def _normalize_gear_item(g: dict) -> dict:
+    return {
+        "uuid": g.get("uuid") or "",
+        "name": g.get("customMakeModel") or g.get("displayName") or "",
+        "type": g.get("gearTypeName", ""),
+        "status": g.get("gearStatusName", ""),
+        "dateBegin": (g.get("dateBegin") or "")[:10],
+        "dateEnd": (g.get("dateEnd") or "")[:10] or None,
+        "maxMeters": g.get("maximumMeters"),
+        "totalDistance": g.get("totalDistance"),
+        "totalActivities": g.get("totalActivities"),
+    }
+
+
+def fetch_activity_gear(api, activity_id: int) -> list | None:
+    raw = _try(api.get_activity_gear, activity_id, label=f"gear {activity_id}")
+    if raw is None:
+        return None
+    if not isinstance(raw, list) or any(
+        not isinstance(item, dict) or not item.get("uuid") for item in raw
+    ):
+        print(f"  WARNING: Unexpected gear response for activity {activity_id}")
+        return None
+    return [_normalize_gear_item(item) for item in raw]
+
+
 def _fetch_gear_data(api) -> list:
     """Fetch all gear items with usage stats from Garmin Connect."""
     try:
@@ -402,17 +428,7 @@ def _fetch_gear_data(api) -> list:
         if not name:
             continue
 
-        item = {
-            'uuid':       uuid,
-            'name':       name,
-            'type':       g.get('gearTypeName', ''),
-            'status':     g.get('gearStatusName', ''),
-            'dateBegin':  (g.get('dateBegin') or '')[:10],
-            'dateEnd':    (g.get('dateEnd') or '')[:10] or None,
-            'maxMeters':  g.get('maximumMeters'),
-            'totalDistance': None,
-            'totalActivities': None,
-        }
+        item = _normalize_gear_item(g)
 
         # Try to get stats
         if uuid:
@@ -799,6 +815,13 @@ def main():
         detail_path = output_dir / f"activity_{activity_id}.json"
 
         if detail_path.exists() and not args.force:
+            cached = json.loads(detail_path.read_text(encoding="utf-8"))
+            if "gear" not in cached:
+                activity_gear = fetch_activity_gear(api, activity_id)
+                if activity_gear is not None:
+                    cached["gear"] = activity_gear
+                    save_json(detail_path, cached)
+                time.sleep(0.3)
             if args.no_gpx or not _needs_gpx_backfill(detail_path):
                 print(f"  [{i+1}/{len(summaries)}] {activity_id} — already cached, skipping")
                 continue
@@ -823,9 +846,12 @@ def main():
         hr_zones = fetch_activity_hr_zones(api, activity_id)
         splits = fetch_activity_splits(api, activity_id)
         gpx_coords = [] if args.no_gpx else fetch_gpx_coords(api, activity_id)
+        activity_gear = fetch_activity_gear(api, activity_id)
 
         try:
             full = normalize_detail(summary, details, hr_zones, splits, gpx_coords)
+            if activity_gear is not None:
+                full["gear"] = activity_gear
             save_json(detail_path, full)
         except Exception as e:
             print(f"  WARNING: Failed to process detail for {activity_id}: {e}")

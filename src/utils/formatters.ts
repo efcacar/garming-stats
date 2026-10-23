@@ -1,5 +1,15 @@
 import type { Sport } from '../types/garmin'
 
+export function gearTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    Shoes: 'Zapatillas',
+    Bike: 'Bicicleta',
+    Wetsuit: 'Traje de neopreno',
+    Watch: 'Reloj',
+  }
+  return labels[type] ?? type
+}
+
 export function fmtNum(n: number): string {
   return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
