@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { ActivitySummary } from '../types/garmin'
 import { formatPace, formatDuration, formatDistance, formatDate, sportLabel, sportColor, sportIcon } from '../utils/formatters'
+import ActivityMetrics from './ActivityMetrics'
 
 interface Props {
   activity: ActivitySummary
@@ -29,7 +30,7 @@ export default function ActivityCard({ activity: a, compact }: Props) {
         )}
       </div>
 
-      {/* Main metrics */}
+      {compact ? (
       <div className="grid grid-cols-3 gap-2 mt-3">
         <Metric label="Distancia" value={formatDistance(a.distance, a.sport)} />
         <Metric label="Duración" value={formatDuration(a.duration)} />
@@ -42,14 +43,9 @@ export default function ActivityCard({ activity: a, compact }: Props) {
           : <Metric label="FC Media" value={a.avgHR > 0 ? `${a.avgHR} bpm` : '–'} />
         }
       </div>
-
-      {!compact && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2">
-          <Metric label="FC Media" value={a.avgHR > 0 ? `${a.avgHR} bpm` : '–'} />
-          <Metric label="Elevación +" value={`${a.elevationGain} m`} />
-          <Metric label="Descenso" value={`${a.elevationLoss} m`} />
-          <Metric label="Altitud máx." value={a.maxElevation != null ? `${a.maxElevation} m` : '–'} />
-          <Metric label="TSS" value={a.tss != null ? String(Math.round(a.tss)) : '–'} />
+      ) : (
+        <div className="mt-3">
+          <ActivityMetrics activity={a} />
         </div>
       )}
     </Link>

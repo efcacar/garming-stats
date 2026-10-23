@@ -101,10 +101,10 @@ export default function Activities() {
       </div>
 
       {/* Filters */}
-      <div className="space-y-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         {/* Sport */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-500 w-16">Deporte</span>
+          <span className="text-xs text-slate-500">Deporte</span>
           <div className="flex flex-wrap bg-slate-800 rounded-lg p-0.5 gap-0.5">
             {[{ value: 'all' as const, label: 'Todos' }, ...availableSports.map(s => ({ value: s, label: SPORT_LABELS[s] ?? s }))].map(({ value, label }) => (
               <button
@@ -121,10 +121,8 @@ export default function Activities() {
           </div>
         </div>
 
-        {/* Row 2: year + distance + sort + count + reset */}
-        <div className="flex gap-3 flex-wrap items-center">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 w-16">Año</span>
+            <span className="text-xs text-slate-500">Año</span>
             <select
               value={yearFilter}
               onChange={e => { setYearFilter(e.target.value); setPage(0) }}
@@ -137,7 +135,7 @@ export default function Activities() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 w-16">Distancia</span>
+            <span className="text-xs text-slate-500">Distancia</span>
             <select
               value={distFilter}
               onChange={e => { setDistFilter(e.target.value); setPage(0) }}
@@ -150,7 +148,7 @@ export default function Activities() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 w-16">Ordenar</span>
+            <span className="text-xs text-slate-500">Ordenar</span>
             <select
               value={sortBy}
               onChange={e => { setSortBy(e.target.value); setPage(0) }}
@@ -172,7 +170,6 @@ export default function Activities() {
               Limpiar filtros
             </button>
           )}
-        </div>
       </div>
 
       {/* List */}
