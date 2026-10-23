@@ -97,7 +97,6 @@ export default function WorkoutBlocks({ blocks, laps, sport }: {
                   <div className="text-sm font-semibold" style={{ color }}>
                     {index + 1}. {style?.label ?? block.type ?? 'Sin clasificación'}
                   </div>
-                  <div className="text-[10px] text-slate-500">{block.type ?? 'Sin clasificación Garmin'}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-semibold tabular-nums text-slate-200">{formatDuration(block.duration)}</div>
