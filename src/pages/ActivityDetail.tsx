@@ -24,14 +24,17 @@ export default function ActivityDetailPage() {
 
   useEffect(() => {
     if (!id) return
+    let cancelled = false
     setLoading(true)
     setHoveredSample(null)
     setHoveredIdx(null)
     loadDetail(Number(id)).then(d => {
+      if (cancelled) return
       setDetail(d)
       setLoading(false)
     })
-  }, [id, loadDetail])
+    return () => { cancelled = true }
+  }, [id, loadDetail, activities])
 
   const summary = activities.find(a => a.id === Number(id))
 

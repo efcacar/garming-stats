@@ -18,6 +18,7 @@ export interface Lap {
   avgSpeed: number | null // km/h
   avgPower: number | null // watts
   elevationGain: number
+  elevationLoss?: number | null
 }
 
 export interface WorkoutBlock extends Lap {

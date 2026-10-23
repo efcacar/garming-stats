@@ -243,6 +243,7 @@ def _normalize_laps(laps_data: list, sport: str) -> list:
                 "avgSpeed": round(speed * 3.6, 1) if speed else None,
                 "avgPower": round(lap.get("avgPower") or 0) or None,
                 "elevationGain": round(lap.get("elevationGain") or 0),
+                "elevationLoss": round(lap["elevationLoss"]) if lap.get("elevationLoss") is not None else None,
             })
         else:
             # Legacy activityDetailMetrics format
@@ -259,6 +260,7 @@ def _normalize_laps(laps_data: list, sport: str) -> list:
                 "avgSpeed": round(speed * 3.6, 1) if speed else None,
                 "avgPower": round(metrics.get("avgPower") or 0) or None,
                 "elevationGain": round(metrics.get("elevationGain") or 0),
+                "elevationLoss": round(metrics["elevationLoss"]) if metrics.get("elevationLoss") is not None else None,
             })
     return laps
 

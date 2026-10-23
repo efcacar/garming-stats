@@ -880,12 +880,15 @@ def main():
             if "avgTemperature" not in cached or summary.get("avgTemperature") is not None:
                 cached["avgTemperature"] = summary.get("avgTemperature")
                 save_json(detail_path, cached)
-            if any("intensityType" not in lap for lap in cached.get("laps", [])):
+            if any(
+                "intensityType" not in lap or "elevationLoss" not in lap
+                for lap in cached.get("laps", [])
+            ):
                 splits = fetch_activity_splits(api, activity_id)
                 if isinstance(splits.get("lapDTOs"), list) or isinstance(splits.get("splits"), list):
                     cached["laps"] = normalize_detail(summary, {}, [], splits, [])["laps"]
                     save_json(detail_path, cached)
-                    print(f"    Updated Garmin split classifications for {activity_id}")
+                    print(f"    Updated Garmin split classifications and elevation for {activity_id}")
                 time.sleep(0.3)
             if "gear" not in cached:
                 activity_gear = fetch_activity_gear(api, activity_id)

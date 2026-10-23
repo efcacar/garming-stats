@@ -77,7 +77,7 @@ export const useActivityStore = create<ActivityState>()(
           if (!res.ok) throw new Error(`No se encontró /data/activities.json (status ${res.status})`)
           const data: ActivitySummary[] = await res.json()
           data.sort((a, b) => b.startTime.localeCompare(a.startTime))
-          set({ activities: data, loading: false })
+          set({ activities: data, detailCache: {}, loading: false })
         } catch (e) {
           set({ loading: false, error: (e as Error).message })
         }
@@ -178,7 +178,7 @@ export const useActivityStore = create<ActivityState>()(
         const cached = get().detailCache[id]
         if (cached) return cached
         try {
-          const res = await fetch(`/data/activity_${id}.json`)
+          const res = await fetch(`/data/activity_${id}.json`, { cache: 'no-store' })
           if (!res.ok) return null
           const detail: ActivityDetail = await res.json()
           set(state => ({ detailCache: { ...state.detailCache, [id]: detail } }))
