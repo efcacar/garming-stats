@@ -9,7 +9,15 @@ interface Props {
   hoveredPosition?: [number, number] | null
 }
 
+const CARTO_KEY = import.meta.env.VITE_CARTO_API_KEY?.trim()
+
 const TILE_LAYERS = {
+  voyager: {
+    url: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    title: 'Calles',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxZoom: 20,
+  },
   terrain: {
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     title: 'Relieve',
@@ -17,7 +25,7 @@ const TILE_LAYERS = {
     maxZoom: 17,
   },
   dark: {
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    url: 'https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',
     title: 'Oscuro',
     attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
     maxZoom: 19,
@@ -39,7 +47,9 @@ export default function ActivityMap({ coords, sport = 'other', height = 320, hov
   const mapRef = useRef<L.Map | null>(null)
   const hoverMarkerRef = useRef<L.CircleMarker | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
-  const [tileStyle, setTileStyle] = useState<keyof typeof TILE_LAYERS>('terrain')
+  const [tileStyle, setTileStyle] = useState<keyof typeof TILE_LAYERS>('voyager')
+  const [tileError, setTileError] = useState(false)
+  const needsCartoKey = tileStyle === 'voyager' || tileStyle === 'dark'
 
   useEffect(() => {
     if (!containerRef.current || !coords.length) return
@@ -73,10 +83,16 @@ export default function ActivityMap({ coords, sport = 'other', height = 320, hov
     const map = mapRef.current
     if (!map) return
     tileLayerRef.current?.remove()
+    tileLayerRef.current = null
+    setTileError(false)
+    if ((tileStyle === 'voyager' || tileStyle === 'dark') && !CARTO_KEY) return
     const layer = TILE_LAYERS[tileStyle]
-    tileLayerRef.current = L.tileLayer(layer.url, {
+    const url = tileStyle === 'voyager' || tileStyle === 'dark'
+      ? `${layer.url}?key=${encodeURIComponent(CARTO_KEY ?? '')}`
+      : layer.url
+    tileLayerRef.current = L.tileLayer(url, {
       attribution: layer.attribution, maxZoom: layer.maxZoom,
-    }).addTo(map)
+    }).on('tileerror', () => setTileError(true)).addTo(map)
     tileLayerRef.current.bringToBack()
   }, [tileStyle, coords, sport])
 
@@ -105,6 +121,13 @@ export default function ActivityMap({ coords, sport = 'other', height = 320, hov
   return (
     <div style={{ height }} className="relative rounded-xl overflow-hidden border border-slate-700/50">
       <div ref={containerRef} aria-label="Mapa del recorrido" className="h-full w-full" />
+      {((needsCartoKey && !CARTO_KEY) || tileError) && (
+        <div role="alert" className="absolute bottom-8 left-3 right-3 z-[1000] rounded-lg bg-slate-900/95 p-3 text-center text-xs text-slate-300">
+          {needsCartoKey && !CARTO_KEY
+            ? 'Configura VITE_CARTO_API_KEY en .env.local y reinicia el servidor. Puedes usar Relieve o Satélite mientras tanto.'
+            : 'No se pudieron cargar algunas imágenes del mapa. Comprueba la conexión y, para CARTO, la clave y sus límites.'}
+        </div>
+      )}
       <div className="absolute top-2 right-2 z-[1000] flex gap-1">
         {(Object.keys(TILE_LAYERS) as (keyof typeof TILE_LAYERS)[]).map(key => (
           <button key={key} type="button" title={TILE_LAYERS[key].title} aria-pressed={tileStyle === key}

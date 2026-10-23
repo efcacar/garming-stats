@@ -129,7 +129,15 @@ Solo hace falta hacerlo **una vez** (o cuando cambien las dependencias del proye
 
 ### Mapas del recorrido
 
-El detalle utiliza Leaflet con relieve de OpenTopoMap, mapa oscuro de CARTO y satélite de Esri. No requiere clave de API ni activar la facturación de Google. Las capas se descargan de sus proveedores y muestran sus atribuciones.
+El detalle utiliza Leaflet con **CARTO Voyager (Calles) por defecto**, además de relieve de OpenTopoMap, mapa oscuro de CARTO y satélite de Esri. Las capas CARTO requieren una clave de **Basemaps**; Relieve y Satélite no utilizan esa clave. Las capas se descargan de sus proveedores y muestran sus atribuciones; su uso está sujeto a las condiciones y límites de cada proveedor.
+
+Obtén una clave en [CARTO Basemaps](https://carto.com/basemaps/apikey/), eligiendo el plan gratuito para proyectos personales según sus condiciones vigentes. Añade a `.env.local` en la raíz:
+
+```dotenv
+VITE_CARTO_API_KEY=tu_clave_de_basemaps
+```
+
+Reinicia `npm run dev` (o vuelve a compilar si utilizas una versión publicada). Es una clave para mapas en el navegador y será visible en las peticiones: no uses una credencial privada de tu cuenta CARTO ni la subas al repositorio. Sin clave se muestra un aviso y no se solicitan las capas CARTO; puedes seleccionar Relieve o Satélite. No hace falta activar Google Cloud ni su facturación.
 
 Se mantienen el recorrido, los puntos de inicio/final y el seguimiento Play/Pausa sincronizado con las gráficas a partir de las coordenadas de Garmin. La aplicación ya no carga Google Maps ni utiliza `VITE_GOOGLE_MAPS_API_KEY`; puedes eliminar esa variable de tu configuración local y desactivar la clave en Google Cloud si no la usas en otros proyectos.
 
