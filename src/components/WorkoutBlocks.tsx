@@ -22,7 +22,7 @@ export default function WorkoutBlocks({ blocks, laps, sport }: {
 }) {
   if (!blocks?.length) {
     return (
-      <section className="mb-6">
+      <section className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
         <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Tramos de entrenamiento</h2>
         <p className="text-sm text-slate-500">
           {blocks
@@ -34,7 +34,7 @@ export default function WorkoutBlocks({ blocks, laps, sport }: {
   }
 
   return (
-    <section className="mb-6">
+    <section className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
       <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">
         Tramos de entrenamiento · {blocks.length}
       </h2>

@@ -30,7 +30,7 @@ export default function ActivityCharts({ samples, hoveredIndex, onHover }: {
         return (
           <section key={metric.key} aria-label={metric.label} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 min-w-0">
             <div className="flex flex-wrap justify-between gap-2 text-xs mb-2">
-              <h2 style={{ color: metric.color }}>{metric.label}</h2>
+              <h2 className="text-xs font-normal text-slate-500 uppercase tracking-wider">{metric.label}</h2>
               <span className="text-slate-300 tabular-nums">
                 {selected && `${formatDuration(selected.time)} · ${selected.distance != null ? `${selected.distance.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} km` : 'Sin distancia'} · ${value != null ? format(value) : 'Sin dato'}`}
               </span>

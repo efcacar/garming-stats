@@ -91,23 +91,6 @@ export default function ActivityDetailPage() {
           {detail && <WorkoutBlocks blocks={detail.workoutBlocks} laps={detail.laps} sport={act.sport} />}
         </div>
         <div className="min-w-0 space-y-4">
-      <section>
-        <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Material utilizado</h2>
-        {detail?.gear && detail.gear.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3">
-            {detail.gear.map(item => (
-              <GearCard key={item.uuid} item={gear.find(g => g.uuid === item.uuid) ?? item} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-slate-500">
-            {detail?.gear
-              ? 'Esta actividad no tiene material asociado en Garmin Connect.'
-              : 'Material pendiente de sincronizar. Vuelve a sincronizar para cargar el equipo de esta actividad.'}
-          </p>
-        )}
-      </section>
-
       {/* HR Zones */}
       {detail?.hrZones && detail.hrZones.length > 0 && (
         <section className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
@@ -134,6 +117,23 @@ export default function ActivityDetailPage() {
           </div>
         </section>
       )}
+
+      <section className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
+        <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Material utilizado</h2>
+        {detail?.gear && detail.gear.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3">
+            {detail.gear.map(item => (
+              <GearCard key={item.uuid} item={gear.find(g => g.uuid === item.uuid) ?? item} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">
+            {detail?.gear
+              ? 'Esta actividad no tiene material asociado en Garmin Connect.'
+              : 'Material pendiente de sincronizar. Vuelve a sincronizar para cargar el equipo de esta actividad.'}
+          </p>
+        )}
+      </section>
 
         </div>
       </div>
