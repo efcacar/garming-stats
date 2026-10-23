@@ -11,6 +11,7 @@ import ActivityMetrics from '../components/ActivityMetrics'
 import GearCard from '../components/GearCard'
 
 import WorkoutBlocks from '../components/WorkoutBlocks'
+import useActivityPlayback from '../hooks/useActivityPlayback'
 
 export default function ActivityDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -21,6 +22,8 @@ export default function ActivityDetailPage() {
   const [loading, setLoading] = useState(true)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   const [hoveredSample, setHoveredSample] = useState<number | null>(null)
+  const playback = useActivityPlayback(detail?.samples)
+  const selectedIndex = playback.playing ? playback.index : hoveredSample ?? playback.index
 
   useEffect(() => {
     if (!id) return
@@ -47,7 +50,7 @@ export default function ActivityDetailPage() {
   }
 
   const act = detail ?? summary
-  const sample = hoveredSample != null ? detail?.samples?.[hoveredSample] : undefined
+  const sample = selectedIndex != null ? detail?.samples?.[selectedIndex] : undefined
   if (!act) {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
@@ -73,6 +76,45 @@ export default function ActivityDetailPage() {
       </div>
 
       {/* Map */}
+      {playback.available && (
+        <section aria-label="Reproducción del entrenamiento" className="flex flex-wrap items-center gap-3 bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 mb-3">
+          <button
+            type="button"
+            onClick={() => { setHoveredSample(null); playback.toggle() }}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white"
+            aria-label={playback.playing ? 'Pausar recorrido' : 'Reproducir recorrido'}
+            title={playback.playing ? 'Pausar recorrido' : 'Reproducir recorrido'}
+          >
+            <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+              {playback.playing
+                ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+                : <path d="M7 4v16l14-8z" />}
+            </svg>
+          </button>
+          <button type="button" onClick={() => { setHoveredSample(null); playback.restart() }} aria-label="Reiniciar recorrido" title="Reiniciar recorrido" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-700/50">
+            <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 4v6h6M3 10a9 9 0 1 1 2.6 8.4" />
+            </svg>
+          </button>
+          <span className="text-xs text-slate-300 tabular-nums">{formatDuration(playback.time)} / {formatDuration(playback.end)}</span>
+          <input
+            type="range"
+            aria-label="Posición del recorrido"
+            min={playback.start}
+            max={playback.end}
+            step="any"
+            value={playback.time}
+            onChange={event => { setHoveredSample(null); playback.seek(Number(event.target.value)) }}
+            className="min-w-32 flex-1 accent-primary"
+          />
+          <label className="text-xs text-slate-400 flex items-center gap-2">
+            Velocidad
+            <select aria-label="Velocidad de reproducción" value={playback.speed} onChange={event => playback.setSpeed(Number(event.target.value))} className="bg-slate-800 text-slate-200 rounded p-1">
+              {[1, 10, 30, 60, 120].map(speed => <option key={speed} value={speed}>{speed}x</option>)}
+            </select>
+          </label>
+        </section>
+      )}
       {detail?.gpxCoords && detail.gpxCoords.length > 0 && (
         <div className="mb-3">
           <ActivityMap coords={detail.gpxCoords} sport={act.sport} height={320} hoveredIdx={hoveredIdx} hoveredPosition={sample?.latitude != null && sample.longitude != null ? [sample.latitude, sample.longitude] : null} />
@@ -81,7 +123,9 @@ export default function ActivityDetailPage() {
 
       {/* Elevation chart */}
       {detail?.samples && detail.samples.length > 0 ? (
-        <ActivityCharts samples={detail.samples} hoveredIndex={hoveredSample} onHover={setHoveredSample} />
+        <ActivityCharts samples={detail.samples} hoveredIndex={selectedIndex} onHover={index => {
+          if (!playback.playing) setHoveredSample(index)
+        }} />
       ) : detail?.gpxCoords && detail.gpxCoords.length > 0 && (
         <ElevationChart coords={detail.gpxCoords} onHover={setHoveredIdx} />
       )}

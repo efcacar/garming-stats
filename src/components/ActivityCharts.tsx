@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, CartesianGrid, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { ActivitySample } from '../types/garmin'
 import { formatDuration, formatPace } from '../utils/formatters'
 
@@ -53,7 +53,8 @@ export default function ActivityCharts({ samples, hoveredIndex, onHover }: {
                 <YAxis reversed={metric.key === 'pace'} domain={['auto', 'auto']} width={48} tick={{ fill: '#64748b', fontSize: 10 }} tickFormatter={v => metric.key === 'pace' ? formatPace(Number(v)).replace(' /km', '') : String(Math.round(Number(v)))} axisLine={false} tickLine={false} />
                 <Tooltip content={() => null} cursor={false} />
                 {selected && <ReferenceLine x={selected.time} stroke="#cbd5e1" strokeDasharray="3 3" />}
-                <Area type="linear" dataKey={metric.key} baseValue={metric.key === 'pace' ? 'dataMax' : 'auto'} stroke={metric.color} fill={metric.color} fillOpacity={0.22} strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} connectNulls={false} isAnimationActive={false} />
+                <Area type="linear" dataKey={metric.key} baseValue={metric.key === 'pace' ? 'dataMax' : undefined} stroke={metric.color} fill={metric.color} fillOpacity={0.22} strokeWidth={1.5} dot={false} activeDot={false} connectNulls={false} isAnimationActive={false} />
+                {selected && value != null && <ReferenceDot x={selected.time} y={value} r={4} fill={metric.color} stroke="#ffffff" />}
               </AreaChart>
             </ResponsiveContainer>
           </section>
