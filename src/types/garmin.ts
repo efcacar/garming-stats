@@ -10,6 +10,7 @@ export interface HRZone {
 
 export interface Lap {
   index: number
+  intensityType?: string | null
   distance: number     // km
   duration: number     // seconds
   avgHR: number | null
@@ -17,6 +18,11 @@ export interface Lap {
   avgSpeed: number | null // km/h
   avgPower: number | null // watts
   elevationGain: number
+}
+
+export interface WorkoutBlock extends Lap {
+  type: string | null
+  lapIndexes: number[]
 }
 
 export interface ActivitySummary {
@@ -48,6 +54,7 @@ export interface ActivitySummary {
 }
 
 export interface ActivityDetail extends ActivitySummary {
+  workoutBlocks?: WorkoutBlock[]
   gear?: GearItem[]
   laps: Lap[]
   hrZones: HRZone[]

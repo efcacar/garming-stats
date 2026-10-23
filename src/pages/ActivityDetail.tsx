@@ -9,6 +9,8 @@ import ElevationChart from '../components/ElevationChart'
 import MetricCard from '../components/MetricCard'
 import GearCard from '../components/GearCard'
 
+import WorkoutBlocks from '../components/WorkoutBlocks'
+
 export default function ActivityDetailPage() {
   const { id } = useParams<{ id: string }>()
   const loadDetail = useActivityStore(s => s.loadDetail)
@@ -140,48 +142,7 @@ export default function ActivityDetailPage() {
         </section>
       )}
 
-      {/* Laps */}
-      {detail?.laps && detail.laps.length > 1 && (
-        <section className="mb-6">
-          <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">
-            Splits ({detail.laps.length} km)
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-slate-500 border-b border-slate-700">
-                  <th className="pb-2 pr-4">Km</th>
-                  <th className="pb-2 pr-4">Tiempo</th>
-                  {act.sport === 'running' && <th className="pb-2 pr-4">Ritmo</th>}
-                  {act.sport === 'cycling' && <th className="pb-2 pr-4">Velocidad</th>}
-                  {act.avgPower != null && <th className="pb-2 pr-4">Potencia</th>}
-                  <th className="pb-2 pr-4">FC</th>
-                  <th className="pb-2">Elev.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detail.laps.map(lap => (
-                  <tr key={lap.index} className="border-b border-slate-800 hover:bg-slate-800/40">
-                    <td className="py-2 pr-4 text-slate-400">{lap.index}</td>
-                    <td className="py-2 pr-4 font-mono text-slate-200">{formatDuration(lap.duration)}</td>
-                    {act.sport === 'running' && (
-                      <td className="py-2 pr-4 font-mono text-slate-200">{formatPace(lap.avgPace)}</td>
-                    )}
-                    {act.sport === 'cycling' && (
-                      <td className="py-2 pr-4 text-slate-200">{lap.avgSpeed ? `${lap.avgSpeed} km/h` : '–'}</td>
-                    )}
-                    {act.avgPower != null && (
-                      <td className="py-2 pr-4 text-slate-200">{lap.avgPower ? `${lap.avgPower}W` : '–'}</td>
-                    )}
-                    <td className="py-2 pr-4 text-slate-400">{lap.avgHR ?? '–'}</td>
-                    <td className="py-2 text-slate-400">{lap.elevationGain}m</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+      {detail && <WorkoutBlocks blocks={detail.workoutBlocks} laps={detail.laps} sport={act.sport} />}
     </div>
   )
 }

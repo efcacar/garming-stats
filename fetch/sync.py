@@ -118,6 +118,18 @@ def fetch_activity_splits(api, activity_id: int) -> dict:
     return result or {}
 
 
+def fetch_workout_blocks(api, activity_id: int) -> list | None:
+    from normalizer import normalize_workout_blocks
+
+    raw = _try(api.get_activity_typed_splits, activity_id, label=f"workout blocks {activity_id}")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or not isinstance(raw.get("splits"), list):
+        print(f"  WARNING: Unexpected workout block response for activity {activity_id}")
+        return None
+    return normalize_workout_blocks(raw)
+
+
 def fetch_gpx_coords(api, activity_id: int) -> list:
     """Return [[lat, lon, ele?], ...] from GPX download, or [] on failure."""
     import re
@@ -187,6 +199,12 @@ def _needs_gpx_backfill(detail_path: Path) -> bool:
         return False
     try:
         cached = json.loads(detail_path.read_text(encoding="utf-8"))
+        if "workoutBlocks" not in cached:
+            blocks = fetch_workout_blocks(api, activity_id)
+            if blocks is not None:
+                cached["workoutBlocks"] = blocks
+                save_json(detail_path, cached)
+            time.sleep(0.3)
     except Exception:
         return False
 
@@ -816,6 +834,13 @@ def main():
 
         if detail_path.exists() and not args.force:
             cached = json.loads(detail_path.read_text(encoding="utf-8"))
+            if any("intensityType" not in lap for lap in cached.get("laps", [])):
+                splits = fetch_activity_splits(api, activity_id)
+                if isinstance(splits.get("lapDTOs"), list) or isinstance(splits.get("splits"), list):
+                    cached["laps"] = normalize_detail(summary, {}, [], splits, [])["laps"]
+                    save_json(detail_path, cached)
+                    print(f"    Updated Garmin split classifications for {activity_id}")
+                time.sleep(0.3)
             if "gear" not in cached:
                 activity_gear = fetch_activity_gear(api, activity_id)
                 if activity_gear is not None:
@@ -850,6 +875,9 @@ def main():
 
         try:
             full = normalize_detail(summary, details, hr_zones, splits, gpx_coords)
+            blocks = fetch_workout_blocks(api, activity_id)
+            if blocks is not None:
+                full["workoutBlocks"] = blocks
             if activity_gear is not None:
                 full["gear"] = activity_gear
             save_json(detail_path, full)

@@ -84,6 +84,8 @@ python fetch/sync.py --limit N
 
 - Inicia sesión en Garmin Connect con tu `.env`
 - Descarga la lista de actividades y los detalles de cada una
+- En el detalle, los parciales conservan la clasificación original de Garmin (`WARMUP`, `ACTIVE`, `REST`, `COOLDOWN`, etc.), sin deducir fases ni asumir que cada tramo sea un kilómetro o una vuelta manual. Una sincronización normal completa estas etiquetas en las actividades ya descargadas.
+- Los tramos de entrenamiento se muestran como bloques desplegables utilizando la agrupación original de Garmin (`typedsplits` y `lapIndexes`). Cada bloque muestra su resumen y sus parciales por distancia, incluyendo las fracciones de kilómetro, sin fusionar bloques de la misma intensidad ni interpolar kilómetros que Garmin no proporciona. La siguiente sincronización completa estos bloques en actividades ya descargadas.
 - Descarga también sueño, equipo y peso/composición corporal
 - Guarda el material asociado a cada actividad para mostrarlo en su detalle, con las estadísticas acumuladas del equipo y su vida útil cuando estén disponibles.
 - Guarda todo en `public/data/` (archivos JSON)

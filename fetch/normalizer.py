@@ -141,6 +141,22 @@ def normalize_summary(activity: dict) -> dict:
     return summary
 
 
+def normalize_workout_blocks(raw: dict) -> list:
+    blocks = []
+    for split in raw.get("splits", []):
+        lap_indexes = split.get("lapIndexes")
+        if not lap_indexes:
+            continue
+        metrics = _normalize_laps([split], "")[0]
+        blocks.append({
+            **metrics,
+            "index": split.get("messageIndex", len(blocks) + 1),
+            "type": split.get("type"),
+            "lapIndexes": lap_indexes,
+        })
+    return blocks
+
+
 def normalize_detail(summary: dict, details: dict, hr_zones_raw: list, splits_raw: dict, gpx_coords: list) -> dict:
     """Merges summary + activity details + HR zones + splits + GPS into the full ActivityDetail."""
     detail = dict(summary)
@@ -150,7 +166,6 @@ def normalize_detail(summary: dict, details: dict, hr_zones_raw: list, splits_ra
     laps_data = (
         splits_raw.get("lapDTOs")
         or splits_raw.get("splits")
-        or _safe(details, "activityDetailMetrics")
         or []
     )
     detail["laps"] = _normalize_laps(laps_data, summary.get("sport"))
@@ -183,6 +198,7 @@ def _normalize_laps(laps_data: list, sport: str) -> list:
             avg_pace = round(1000 / speed) if speed > 0 else None
             laps.append({
                 "index": lap.get("lapIndex", i + 1),
+                "intensityType": lap.get("intensityType"),
                 "distance": round((lap.get("distance") or 0) / 1000, 3),
                 "duration": round(lap.get("duration") or lap.get("elapsedDuration") or 0),
                 "avgHR": round(lap.get("averageHR") or 0) or None,
@@ -198,6 +214,7 @@ def _normalize_laps(laps_data: list, sport: str) -> list:
             avg_pace = round(1000 / speed) if speed > 0 else None
             laps.append({
                 "index": i + 1,
+                "intensityType": lap.get("intensityType"),
                 "distance": round((metrics.get("distance") or 0) / 1000, 3),
                 "duration": round(metrics.get("duration") or 0),
                 "avgHR": round(metrics.get("averageHR") or 0) or None,
