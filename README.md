@@ -98,6 +98,8 @@ python fetch/sync.py --limit N
 
 La primera vez puede tardar **varios minutos** si tienes muchas actividades. Verás el progreso en la terminal.
 
+Los JSON se guardan mediante reemplazo atómico para evitar archivos parcialmente escritos si se interrumpe la sincronización. Si un detalle local contiene JSON dañado, se conserva una copia con sufijo `.corrupt`, se avisa en la terminal y se vuelve a descargar esa actividad en la sincronización normal, sin `--force`.
+
 **Opciones útiles:**
 
 ```bash

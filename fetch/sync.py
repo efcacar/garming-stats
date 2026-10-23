@@ -18,6 +18,7 @@ import argparse
 import json
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -218,8 +219,32 @@ def fetch_gpx_coords(api, activity_id: int) -> list:
 
 def save_json(path: Path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, suffix=".tmp", delete=False) as f:
+            temporary_path = Path(f.name)
+            json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
+def load_cached_detail(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    try:
+        cached = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(cached, dict):
+            raise ValueError("Activity detail must be a JSON object")
+        return cached
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
+        backup = path.with_name(f"{path.name}.{time.time_ns()}.corrupt")
+        path.rename(backup)
+        print(f"  WARNING: Invalid cache {path.name}: {error}. Preserved as {backup.name}; downloading activity again.")
+        return None
 
 
 def _needs_gpx_backfill(detail_path: Path) -> bool:
@@ -855,7 +880,8 @@ def main():
     for i, summary in enumerate(summaries):
         activity_id = summary["id"]
         detail_path = output_dir / f"activity_{activity_id}.json"
-        cached = json.loads(detail_path.read_text(encoding="utf-8")) if detail_path.exists() else {}
+        cached_detail = load_cached_detail(detail_path)
+        cached = cached_detail if cached_detail is not None else {}
         if cached.get("temperatureSynced") and not args.force:
             summary["avgTemperature"] = cached.get("avgTemperature")
         else:
@@ -864,12 +890,11 @@ def main():
                 cached.update(temperature)
                 summary.update(temperature)
                 save_json(output_dir / "activities.json", summaries)
-                if detail_path.exists():
+                if cached_detail is not None:
                     save_json(detail_path, cached)
             time.sleep(0.3)
 
-        if detail_path.exists() and not args.force:
-            cached = json.loads(detail_path.read_text(encoding="utf-8"))
+        if cached_detail is not None and not args.force:
             if "samples" not in cached:
                 details = fetch_activity_details(api, activity_id)
                 if isinstance(details.get("activityDetailMetrics"), list):
@@ -900,10 +925,6 @@ def main():
                 print(f"  [{i+1}/{len(summaries)}] {activity_id} — already cached, skipping")
                 continue
             print(f"  [{i+1}/{len(summaries)}] {activity_id} — cached without map/altimetry, backfilling GPX...")
-            try:
-                cached = json.loads(detail_path.read_text(encoding="utf-8"))
-            except Exception:
-                cached = {}
             gpx_coords = fetch_gpx_coords(api, activity_id)
             if gpx_coords:
                 cached["gpxCoords"] = gpx_coords
