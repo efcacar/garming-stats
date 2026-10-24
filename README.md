@@ -202,6 +202,23 @@ Estos valores se guardan en tu navegador y afectan a los cálculos de zonas, TSS
 
 ## Problemas frecuentes
 
+### "No module named 'dotenv'" al sincronizar desde Docker
+
+El servicio `web` instala las dependencias en el Python del contenedor y utiliza `GARMIN_PYTHON=/usr/bin/python3` para los botones de sincronización e importación de ajustes. Así no utiliza por error el entorno `.venv` del equipo anfitrión montado en `/app`.
+
+Después de actualizar `docker-compose.yml`, recrea el servicio para aplicar la configuración:
+
+```bash
+docker compose up -d --force-recreate web
+docker compose logs -f web
+```
+
+Espera a que termine la instalación y arranque Vite. Puedes comprobar las dependencias sin iniciar una sincronización:
+
+```bash
+docker compose exec web /usr/bin/python3 -c "import dotenv, garminconnect; print('Dependencias disponibles')"
+```
+
 ### "ERROR: Set GARMIN_EMAIL and GARMIN_PASSWORD in .env"
 
 No existe el archivo `.env` o está vacío. Repite el **paso 2**.
