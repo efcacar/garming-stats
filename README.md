@@ -68,6 +68,8 @@ python -m pip install -r fetch/requirements.txt
 ```
 
 > En macOS con Python de Homebrew, esto evita el error de entorno gestionado externamente (PEP 668).
+>
+> Si arrancas con `./start.sh`, este paso es automático: el script crea `.venv` e instala las dependencias de Python si todavía no existe.
 
 ---
 
@@ -163,18 +165,26 @@ Para **cerrar** la app, vuelve a la terminal y pulsa `Ctrl + C`.
 
 ## Resumen rápido (cuando ya lo hayas hecho una vez)
 
-Cada vez que quieras usar la app con datos actualizados:
+Cada vez que quieras sincronizar los datos y arrancar la app, ejecuta desde la raíz del proyecto:
 
 ```bash
-# 1. Sincronizar datos nuevos de Garmin
-source .venv/bin/activate
-python fetch/sync.py
-
-# 2. Arrancar la app
-npm run dev
+./start.sh
 ```
 
-Luego abre [http://localhost:5173](http://localhost:5173) en el navegador.
+El script sincroniza Garmin y, si la sincronización termina correctamente, arranca el frontend. Puedes pasarle las opciones de `sync.py`:
+
+```bash
+# Sincroniza como máximo 20 actividades
+./start.sh --limit 20
+
+# Vuelve a descargar las actividades guardadas
+./start.sh --force
+
+# Combina ambas opciones
+./start.sh --limit 20 --force
+```
+
+Sin `--limit`, sincroniza todas las actividades. Consulta `./start.sh --help` para ver ejemplos. Luego abre [http://localhost:5173](http://localhost:5173) en el navegador.
 
 ---
 
