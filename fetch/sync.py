@@ -247,6 +247,13 @@ def load_cached_detail(path: Path) -> dict | None:
         return None
 
 
+NON_GPS_SPORTS = {"strength", "padel"}
+
+
+def _activity_supports_gps(sport: str | None) -> bool:
+    return sport not in NON_GPS_SPORTS
+
+
 def _needs_gpx_backfill(detail_path: Path) -> bool:
     """True when cached detail exists but misses route or elevation in route points."""
     if not detail_path.exists():
@@ -967,7 +974,7 @@ def main():
                     cached["gear"] = activity_gear
                     save_json(detail_path, cached)
                 time.sleep(0.3)
-            if args.no_gpx or not _needs_gpx_backfill(detail_path):
+            if args.no_gpx or not _activity_supports_gps(summary.get("sport")) or not _needs_gpx_backfill(detail_path):
                 print(f"  [{i+1}/{len(summaries)}] {activity_id} — already cached, skipping")
                 continue
             print(f"  [{i+1}/{len(summaries)}] {activity_id} — cached without map/altimetry, backfilling GPX...")
@@ -986,7 +993,7 @@ def main():
         details = fetch_activity_details(api, activity_id)
         hr_zones = fetch_activity_hr_zones(api, activity_id)
         splits = fetch_activity_splits(api, activity_id)
-        gpx_coords = [] if args.no_gpx else fetch_gpx_coords(api, activity_id)
+        gpx_coords = [] if args.no_gpx or not _activity_supports_gps(summary.get("sport")) else fetch_gpx_coords(api, activity_id)
         activity_gear = fetch_activity_gear(api, activity_id)
 
         try:
