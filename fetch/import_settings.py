@@ -6,7 +6,7 @@ Strategy:
   2. Fallback: take max(maxHR) across the last 100 activities
   3. Estimate LTHR = 89% of maxHR (standard formula)
 
-Outputs JSON to stdout: { maxHR?, lthrRunning?, warnings? }
+Outputs JSON to stdout: { maxHR?, lthrRunning?, thresholdPace?, warnings? }
 """
 import json
 import os
@@ -38,6 +38,38 @@ def main():
     result: dict = {}
     warnings: list[str] = []
     max_hr: int | None = None
+    threshold_hr: int | None = None
+
+    try:
+        get_lactate_threshold = getattr(api, "get_lactate_threshold", None)
+        if get_lactate_threshold is None:
+            warnings.append("Running threshold pace is unavailable in this garminconnect version")
+        else:
+            threshold = get_lactate_threshold(latest=True)
+            speed_data = threshold.get("speed_and_heart_rate", {}) if isinstance(threshold, dict) else {}
+            raw_threshold_hr = speed_data.get("heartRate") if isinstance(speed_data, dict) else None
+            if raw_threshold_hr is not None:
+                try:
+                    parsed_threshold_hr = round(float(raw_threshold_hr))
+                    if 100 <= parsed_threshold_hr <= 220:
+                        threshold_hr = parsed_threshold_hr
+                    else:
+                        warnings.append("Garmin returned an out-of-range running threshold heart rate")
+                except (TypeError, ValueError, OverflowError):
+                    warnings.append("Could not parse running threshold heart rate")
+            speed = speed_data.get("speed") if isinstance(speed_data, dict) else None
+            if speed is None:
+                warnings.append("Could not determine running threshold pace")
+            else:
+                pace = round(1000 / float(speed))
+                if 180 <= pace <= 480:
+                    result["thresholdPace"] = pace
+                else:
+                    warnings.append("Garmin returned an out-of-range running threshold pace")
+    except (TypeError, ValueError, ZeroDivisionError, OverflowError) as e:
+        warnings.append(f"Could not parse running threshold pace: {e}")
+    except Exception as e:
+        warnings.append(f"Running threshold pace fetch skipped: {e}")
 
     # ── Strategy 1: user profile ──────────────────────────────────────────
     try:
@@ -68,9 +100,11 @@ def main():
     # ── Build result ──────────────────────────────────────────────────────
     if max_hr and int(max_hr) > 100:
         result["maxHR"] = int(max_hr)
-        result["lthrRunning"] = round(int(max_hr) * 0.89)
+        result["lthrRunning"] = threshold_hr or round(int(max_hr) * 0.89)
     else:
         warnings.append("Could not determine Max HR")
+        if threshold_hr is not None:
+            result["lthrRunning"] = threshold_hr
 
     if warnings:
         result["warnings"] = warnings

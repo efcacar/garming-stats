@@ -36,6 +36,7 @@ export default function Sidebar({ open, onClose }: Props) {
   const loadSleep = useActivityStore(s => s.loadSleep)
   const loadGear = useActivityStore(s => s.loadGear)
   const loadWeight = useActivityStore(s => s.loadWeight)
+  const loadSettings = useActivityStore(s => s.loadSettings)
   const location = useLocation()
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -66,7 +67,7 @@ export default function Sidebar({ open, onClose }: Props) {
       const res = await fetch('/api/sync', { method: 'POST' })
       const json = await res.json()
       if (!res.ok) throw new Error(json.log || json.error || 'Error')
-      await Promise.all([loadActivities(), loadStats(), loadRecords(), loadSleep(), loadGear(), loadWeight()])
+      await Promise.all([loadActivities(), loadStats(), loadRecords(), loadSleep(), loadGear(), loadWeight(), loadSettings()])
       finishProgress(true)
     } catch (e) {
       setSyncError((e as Error).message.slice(0, 80))

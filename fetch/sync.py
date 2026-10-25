@@ -842,6 +842,52 @@ def _fetch_weight_data(api, output_dir: Path, days_initial: int = 365) -> list:
     return sorted(existing.values(), key=lambda x: x["date"])
 
 
+def _sync_running_thresholds(api, output_dir: Path):
+    try:
+        threshold = api.get_lactate_threshold(latest=True)
+        speed_data = threshold.get("speed_and_heart_rate", {}) if isinstance(threshold, dict) else {}
+        updates = {}
+
+        speed = speed_data.get("speed") if isinstance(speed_data, dict) else None
+        if speed is not None:
+            pace = round(1000 / float(speed))
+            if 180 <= pace <= 480:
+                updates["thresholdPace"] = pace
+            else:
+                print("  WARNING: Garmin returned an out-of-range running threshold pace")
+
+        threshold_hr = speed_data.get("heartRate") if isinstance(speed_data, dict) else None
+        if threshold_hr is not None:
+            heart_rate = round(float(threshold_hr))
+            if 100 <= heart_rate <= 220:
+                updates["lthrRunning"] = heart_rate
+            else:
+                print("  WARNING: Garmin returned an out-of-range running threshold heart rate")
+
+        if not updates:
+            print("  WARNING: Garmin did not provide valid running threshold data")
+            return
+
+        settings_path = output_dir / "settings.json"
+        if settings_path.exists():
+            settings = json.loads(settings_path.read_text(encoding="utf-8"))
+            if not isinstance(settings, dict):
+                print("  WARNING: settings.json is not an object; skipping running threshold data")
+                return
+        else:
+            settings = {}
+
+        settings.update(updates)
+        save_json(settings_path, settings)
+        if "thresholdPace" in updates:
+            pace = updates["thresholdPace"]
+            print(f"  Updated running threshold pace: {pace // 60}:{pace % 60:02d}/km")
+        if "lthrRunning" in updates:
+            print(f"  Updated running threshold heart rate: {updates['lthrRunning']} bpm")
+    except Exception as e:
+        print(f"  WARNING: Could not sync running threshold data: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Sync Garmin activities to local JSON")
     parser.add_argument("--limit", type=int, default=None, help="Max activities to sync (for testing)")
@@ -1091,6 +1137,9 @@ def main():
     weight_entries = _fetch_weight_data(api, output_dir)
     save_json(output_dir / "weight.json", weight_entries)
     print(f"  Saved {len(weight_entries)} weight entries -> public/data/weight.json")
+
+    print("Syncing running threshold pace...")
+    _sync_running_thresholds(api, output_dir)
 
     print("Run 'npm run dev' to open the app.")
 

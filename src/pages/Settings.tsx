@@ -72,10 +72,17 @@ export default function Settings() {
       const partial: Partial<UserSettings> = {}
       if (data.maxHR) partial.maxHR = data.maxHR
       if (data.lthrRunning) partial.lthrRunning = data.lthrRunning
+      if (data.thresholdPace) partial.thresholdPace = data.thresholdPace
       if (Object.keys(partial).length > 0) {
         updateSettings(partial)
-        const labels: Record<string, string> = { maxHR: 'FC Máx', lthrRunning: 'LTHR' }
-        const imported = Object.keys(partial).map(k => `${labels[k]} = ${partial[k as keyof typeof partial]}`).join(', ')
+        const labels: Record<string, string> = { maxHR: 'FC Máx', lthrRunning: 'LTHR', thresholdPace: 'Ritmo umbral' }
+        const imported = Object.keys(partial).map(k => {
+          const value = partial[k as keyof typeof partial]
+          const formatted = k === 'thresholdPace' && typeof value === 'number'
+            ? `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}/km`
+            : value
+          return `${labels[k]} = ${formatted}`
+        }).join(', ')
         const warn = data.warnings?.length ? ` · ${data.warnings[0]}` : ''
         setImportMsg({ ok: true, text: `Importado: ${imported}${warn}` })
       } else {
@@ -225,7 +232,7 @@ export default function Settings() {
           <Section title="Importar desde Garmin">
             <div className="px-5 py-4">
               <p className="text-sm text-slate-400 mb-4">
-                Importa automáticamente la FC máxima y el umbral láctico desde tu historial de Garmin Connect.
+                Importa la FC máxima y los umbrales de carrera disponibles en Garmin Connect. Si Garmin no da la FC umbral, se estima a partir de la FC máxima.
               </p>
               {importMsg && (
                 <div className={`mb-4 px-4 py-2.5 rounded-lg text-xs border ${
