@@ -40,6 +40,7 @@ export default function Sidebar({ open, onClose }: Props) {
   const location = useLocation()
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [syncWarning, setSyncWarning] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -62,15 +63,17 @@ export default function Sidebar({ open, onClose }: Props) {
   async function handleSync() {
     setSyncing(true)
     setSyncError(null)
+    setSyncWarning(null)
     startProgress()
     try {
       const res = await fetch('/api/sync', { method: 'POST' })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.log || json.error || 'Error')
       await Promise.all([loadActivities(), loadStats(), loadRecords(), loadSleep(), loadGear(), loadWeight(), loadSettings()])
+      if (!res.ok || !json.ok) throw new Error(json.error || json.log || 'Error')
+      if (json.warnings?.length) setSyncWarning(json.warnings.join('\n'))
       finishProgress(true)
     } catch (e) {
-      setSyncError((e as Error).message.slice(0, 80))
+      setSyncError((e as Error).message)
       finishProgress(false)
     } finally {
       setSyncing(false)
@@ -116,7 +119,8 @@ export default function Sidebar({ open, onClose }: Props) {
         {!syncing && progress === 100 && (
           <div className="mt-1 text-xs text-green-400">✓ Sincronización completada</div>
         )}
-        {syncError && <div className="text-xs text-red-400 mt-1 leading-tight">{syncError}</div>}
+        {syncError && <div role="alert" className="text-xs text-red-400 mt-1 leading-tight whitespace-pre-wrap break-words max-h-40 overflow-y-auto">{syncError}</div>}
+        {syncWarning && <div role="status" className="text-xs text-amber-400 mt-1 leading-tight whitespace-pre-wrap break-words max-h-40 overflow-y-auto">{syncWarning}</div>}
       </div>
 
       {/* Nav */}

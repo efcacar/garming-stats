@@ -113,9 +113,16 @@ python fetch/sync.py --since 2024-01-01
 
 # Más rápido, sin descargar rutas GPS
 python fetch/sync.py --no-gpx
+
+# Volver a descargar los detalles de una actividad concreta sin tocar las demás
+python fetch/sync.py --activity-id 123456789 --force
 ```
 
 > **Importante:** vuelve a ejecutar `python fetch/sync.py` cuando quieras actualizar los datos con entrenamientos nuevos. Las actividades ya descargadas no se vuelven a pedir a Garmin, salvo para completar datos pendientes como el material asociado. Para actualizar asociaciones de material modificadas en Garmin, utiliza `--force` (puedes combinarlo con `--limit 20`).
+
+En la cabecera del detalle de cada actividad, el botón de actualización fuerza la descarga de sus muestras, parciales, bloques, zonas de FC, recorrido y material. Conserva el resumen local y el resto del historial; no vuelve a descargar sueño, peso ni estadísticas globales.
+
+La sincronización distingue una respuesta vacía válida de una petición fallida. Los detalles antiguos con muestras, parciales o zonas vacíos se revisan de nuevo; si Garmin falla, conserva los datos anteriores y deja pendiente un reintento. Los errores y avisos se muestran en la interfaz, sin indicar éxito completo cuando quedan peticiones de detalle fallidas. El GPX puede no existir en actividades sin recorrido GPS; en ese caso se muestra un aviso y no se borra una ruta anterior.
 
 ---
 
@@ -201,6 +208,19 @@ Estos valores se guardan en tu navegador y afectan a los cálculos de zonas, TSS
 ---
 
 ## Problemas frecuentes
+
+### Solo aparece el resumen, sin mapa, parciales o material
+
+El listado y los detalles se descargan por separado: el resumen puede estar disponible aunque la descarga de detalles falle o se interrumpa. Antes, algunas respuestas fallidas dejaban listas vacías en la caché que no se reintentaban. La sincronización normal ahora revisa esos datos pendientes; también puedes forzar una actividad desde su cabecera.
+
+En la Raspberry, tras actualizar el código, reinicia el servicio web:
+
+```bash
+docker compose restart web
+docker compose logs -f web
+```
+
+Pulsa sincronizar o actualiza una actividad concreta y revisa los avisos. El progreso y los errores de Python también aparecen en los logs de Docker. La API web rechaza una segunda sincronización mientras haya otra en curso. Si has cambiado la configuración de Docker, utiliza `docker compose up -d --force-recreate web` en lugar de reiniciar.
 
 ### "No module named 'dotenv'" al sincronizar desde Docker
 

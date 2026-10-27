@@ -16,10 +16,14 @@ import useActivityPlayback from '../hooks/useActivityPlayback'
 export default function ActivityDetailPage() {
   const { id } = useParams<{ id: string }>()
   const loadDetail = useActivityStore(s => s.loadDetail)
+  const loadActivities = useActivityStore(s => s.loadActivities)
   const activities = useActivityStore(s => s.activities)
   const gear = useActivityStore(s => s.gear)
   const [detail, setDetail] = useState<ActivityDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState<number | null>(null)
+  const [refreshError, setRefreshError] = useState<{ id: number; message: string } | null>(null)
+  const [refreshWarning, setRefreshWarning] = useState<{ id: number; message: string } | null>(null)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   const [hoveredSample, setHoveredSample] = useState<number | null>(null)
   const playback = useActivityPlayback(detail?.samples)
@@ -40,6 +44,24 @@ export default function ActivityDetailPage() {
   }, [id, loadDetail, activities])
 
   const summary = activities.find(a => a.id === Number(id))
+
+  async function refreshActivity() {
+    const activityId = Number(id)
+    setRefreshing(activityId)
+    setRefreshError(null)
+    setRefreshWarning(null)
+    try {
+      const response = await fetch(`/api/sync?activityId=${activityId}`, { method: 'POST' })
+      const result = await response.json()
+      await loadActivities()
+      if (!response.ok || !result.ok) throw new Error(result.error || result.log || 'No se pudo actualizar la actividad.')
+      if (result.warnings?.length) setRefreshWarning({ id: activityId, message: result.warnings.join('\n') })
+    } catch (error) {
+      setRefreshError({ id: activityId, message: (error as Error).message })
+    } finally {
+      setRefreshing(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -64,10 +86,28 @@ export default function ActivityDetailPage() {
     <div className="flex-1 p-6 overflow-y-auto">
       {/* Header */}
       <div className="mb-5">
-        <h1 className="text-xl font-bold text-slate-100">{act.title}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="min-w-0 break-words text-xl font-bold text-slate-100">{act.title}</h1>
+          <button
+            type="button"
+            onClick={refreshActivity}
+            disabled={refreshing !== null}
+            aria-label="Forzar actualización de esta actividad"
+            title="Forzar actualización de esta actividad desde Garmin"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <svg aria-hidden="true" className={`h-4 w-4 ${refreshing === act.id ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
         <div className="text-sm text-slate-500 mt-0.5">
           {formatDate(act.startTime)} · {sportLabel(act.sport)}
         </div>
+        {refreshing === act.id && <p role="status" className="text-xs text-primary mt-2">Actualizando actividad desde Garmin...</p>}
+        {refreshError?.id === act.id && <p role="alert" className="text-xs text-red-400 mt-2 whitespace-pre-wrap break-words max-h-40 overflow-y-auto">{refreshError.message}</p>}
+        {refreshWarning?.id === act.id && <p role="status" className="text-xs text-amber-400 mt-2 whitespace-pre-wrap break-words max-h-40 overflow-y-auto">{refreshWarning.message}</p>}
+        {!detail && <p role="status" className="text-sm text-amber-400 mt-2">Detalle no disponible. Pendiente de descargar desde Garmin.</p>}
       </div>
 
       {/* Key metrics */}

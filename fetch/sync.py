@@ -895,15 +895,78 @@ def _sync_running_thresholds(api, output_dir: Path):
         print(f"  WARNING: Could not sync running threshold data: {e}")
 
 
+def sync_activity_detail(api, summary: dict, output_dir: Path, *, force=False, no_gpx=False) -> bool:
+    from normalizer import normalize_activity_samples, normalize_detail
+
+    activity_id = summary["id"]
+    detail_path = output_dir / f"activity_{activity_id}.json"
+    cached = load_cached_detail(detail_path) or {}
+    full = {**cached, **summary}
+    sections = [
+        (
+            "samples",
+            lambda: _try(api.get_activity_details, activity_id, label=f"details {activity_id}"),
+            lambda raw: isinstance(raw, dict) and isinstance(raw.get("activityDetailMetrics"), list),
+            normalize_activity_samples,
+        ),
+        (
+            "laps",
+            lambda: _try(api.get_activity_splits, activity_id, label=f"splits {activity_id}"),
+            lambda raw: isinstance(raw, dict) and (isinstance(raw.get("lapDTOs"), list) or isinstance(raw.get("splits"), list)),
+            lambda raw: normalize_detail(summary, {}, [], raw, [])["laps"],
+        ),
+        (
+            "hrZones",
+            lambda: _try(api.get_activity_hr_in_timezones, activity_id, label=f"hr_zones {activity_id}"),
+            lambda raw: isinstance(raw, list),
+            lambda raw: normalize_detail(summary, {}, raw, {}, [])["hrZones"],
+        ),
+        ("gear", lambda: fetch_activity_gear(api, activity_id), lambda raw: isinstance(raw, list), lambda raw: raw),
+        ("workoutBlocks", lambda: fetch_workout_blocks(api, activity_id), lambda raw: isinstance(raw, list), lambda raw: raw),
+    ]
+    complete = True
+    for field, fetcher, validate, normalize in sections:
+        marker = f"{field}Synced"
+        legacy_complete = bool(cached.get(field)) if field in {"samples", "laps", "hrZones"} else field in cached
+        needs_lap_update = field == "laps" and any(
+            "intensityType" not in lap or "elevationLoss" not in lap for lap in cached.get("laps", [])
+        )
+        if not force and cached.get(marker, legacy_complete) and not needs_lap_update:
+            continue
+        raw = fetcher()
+        if validate(raw):
+            full[field] = normalize(raw)
+            full[marker] = True
+        else:
+            full[marker] = False
+            complete = False
+            print(f"  WARNING: {field} unavailable for {activity_id}; preserving previous data and retrying next sync")
+        save_json(detail_path, full)
+        time.sleep(0.3)
+
+    if not no_gpx and _activity_supports_gps(summary.get("sport")) and (force or _needs_gpx_backfill(detail_path)):
+        coords = fetch_gpx_coords(api, activity_id)
+        if coords:
+            full["gpxCoords"] = coords
+        else:
+            print(f"  WARNING: GPX unavailable for {activity_id}; preserving previous route")
+        time.sleep(0.3)
+    save_json(detail_path, full)
+    return complete
+
+
 def main():
     parser = argparse.ArgumentParser(description="Sync Garmin activities to local JSON")
     parser.add_argument("--limit", type=int, default=None, help="Max activities to sync (for testing)")
     parser.add_argument("--since", type=str, default=None, help="Only sync activities after this date (YYYY-MM-DD)")
     parser.add_argument("--no-gpx", action="store_true", help="Skip GPS data download (faster)")
     parser.add_argument("--force", action="store_true", help="Re-download and overwrite already-cached activity files")
+    parser.add_argument("--activity-id", type=int, help="Refresh only this activity, preserving the rest of the history")
     args = parser.parse_args()
+    if args.activity_id is not None and args.activity_id <= 0:
+        parser.error("--activity-id must be a positive integer")
 
-    from normalizer import normalize_summary, normalize_detail
+    from normalizer import normalize_summary
 
     output_dir = Path(__file__).parent.parent / "public" / "data"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -911,7 +974,10 @@ def main():
     api = get_api()
 
     # Step 1: Get activity list
-    raw_activities = fetch_activities(api, args.limit, args.since)
+    if args.activity_id is not None:
+        raw_activities = []
+    else:
+        raw_activities = fetch_activities(api, args.limit, args.since)
 
     # Step 2: Normalize summaries
     summaries = []
@@ -923,14 +989,24 @@ def main():
         except Exception as e:
             print(f"  WARNING: Failed to normalize activity {raw.get('activityId')}: {e}")
 
+    selected_summaries = summaries
+    if args.activity_id is not None:
+        summary_path = output_dir / "activities.json"
+        existing = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.exists() else []
+        selected_summaries = [item for item in existing if item["id"] == args.activity_id]
+        if not selected_summaries:
+            sys.exit(f"Activity {args.activity_id} not found locally; sync the activity list first.")
+        summaries = existing
+
     # Save summary list immediately so the app can start loading
     restore_summary_temperatures(summaries, output_dir)
     save_json(output_dir / "activities.json", summaries)
     print(f"Saved {len(summaries)} activity summaries -> public/data/activities.json")
 
     # Step 3: Fetch and save details for each activity
-    print(f"\nFetching details for {len(summaries)} activities (rate-limited)...")
-    for i, summary in enumerate(summaries):
+    print(f"\nFetching details for {len(selected_summaries)} activities (rate-limited)...")
+    failed_activities = []
+    for i, summary in enumerate(selected_summaries):
         activity_id = summary["id"]
         detail_path = output_dir / f"activity_{activity_id}.json"
         cached_detail = load_cached_detail(detail_path)
@@ -947,70 +1023,24 @@ def main():
                     save_json(detail_path, cached)
             time.sleep(0.3)
 
-        if cached_detail is not None and not args.force:
-            if "samples" not in cached:
-                details = fetch_activity_details(api, activity_id)
-                if isinstance(details.get("activityDetailMetrics"), list):
-                    from normalizer import normalize_activity_samples
-                    cached["samples"] = normalize_activity_samples(details)
-                    save_json(detail_path, cached)
-                time.sleep(0.3)
-            if "avgTemperature" not in cached or summary.get("avgTemperature") is not None:
-                cached["avgTemperature"] = summary.get("avgTemperature")
-                save_json(detail_path, cached)
-            if any(
-                "intensityType" not in lap or "elevationLoss" not in lap
-                for lap in cached.get("laps", [])
-            ):
-                splits = fetch_activity_splits(api, activity_id)
-                if isinstance(splits.get("lapDTOs"), list) or isinstance(splits.get("splits"), list):
-                    cached["laps"] = normalize_detail(summary, {}, [], splits, [])["laps"]
-                    save_json(detail_path, cached)
-                    print(f"    Updated Garmin split classifications and elevation for {activity_id}")
-                time.sleep(0.3)
-            if "gear" not in cached:
-                activity_gear = fetch_activity_gear(api, activity_id)
-                if activity_gear is not None:
-                    cached["gear"] = activity_gear
-                    save_json(detail_path, cached)
-                time.sleep(0.3)
-            if args.no_gpx or not _activity_supports_gps(summary.get("sport")) or not _needs_gpx_backfill(detail_path):
-                print(f"  [{i+1}/{len(summaries)}] {activity_id} — already cached, skipping")
-                continue
-            print(f"  [{i+1}/{len(summaries)}] {activity_id} — cached without map/altimetry, backfilling GPX...")
-            gpx_coords = fetch_gpx_coords(api, activity_id)
-            if gpx_coords:
-                cached["gpxCoords"] = gpx_coords
-                save_json(detail_path, cached)
-                print(f"    Backfilled {len(gpx_coords)} GPX points")
-            else:
-                print("    WARNING: GPX still unavailable")
-            time.sleep(0.3)
-            continue
-
-        print(f"  [{i+1}/{len(summaries)}] Fetching {activity_id} ({summary.get('title', '')})...")
-
-        details = fetch_activity_details(api, activity_id)
-        hr_zones = fetch_activity_hr_zones(api, activity_id)
-        splits = fetch_activity_splits(api, activity_id)
-        gpx_coords = [] if args.no_gpx or not _activity_supports_gps(summary.get("sport")) else fetch_gpx_coords(api, activity_id)
-        activity_gear = fetch_activity_gear(api, activity_id)
-
+        print(f"  [{i+1}/{len(selected_summaries)}] Syncing {activity_id} ({summary.get('title', '')})...")
         try:
-            full = normalize_detail(summary, details, hr_zones, splits, gpx_coords)
-            blocks = fetch_workout_blocks(api, activity_id)
-            if blocks is not None:
-                full["workoutBlocks"] = blocks
-            if activity_gear is not None:
-                full["gear"] = activity_gear
-            save_json(detail_path, full)
+            if not sync_activity_detail(api, summary, output_dir, force=args.force, no_gpx=args.no_gpx):
+                failed_activities.append(activity_id)
         except Exception as e:
+            failed_activities.append(activity_id)
             print(f"  WARNING: Failed to process detail for {activity_id}: {e}")
 
         # Rate limiting — critical to avoid Garmin banning the account
         time.sleep(0.5)
 
     save_json(output_dir / "activities.json", summaries)
+
+    if args.activity_id is not None:
+        if failed_activities:
+            sys.exit("Activity sync incomplete; see warnings above. Previous data has been preserved.")
+        print(f"Activity {args.activity_id} refreshed.")
+        return
 
     # Step 4: Compute and save global stats
     stats = compute_stats(summaries)
@@ -1149,6 +1179,8 @@ def main():
     _sync_running_thresholds(api, output_dir)
 
     print("Run 'npm run dev' to open the app.")
+    if failed_activities:
+        sys.exit(f"Sync incomplete: {len(failed_activities)} activities have pending details. See warnings above.")
 
 
 def compute_stats(summaries: list) -> dict:

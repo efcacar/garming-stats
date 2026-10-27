@@ -21,6 +21,7 @@ export default defineConfig({
         const settingsPath = resolve(__dirname, 'public/data/settings.json')
         const venvPython = resolve(__dirname, '.venv/bin/python')
         const pythonCmd = process.env.GARMIN_PYTHON ?? (existsSync(venvPython) ? venvPython : 'python3')
+        let syncing = false
 
         // GET /api/settings — read settings file
         server.middlewares.use('/api/settings', (req, res) => {
@@ -57,31 +58,54 @@ export default defineConfig({
             return
           }
 
+          const activityId = new URL(req.url ?? '/', 'http://localhost').searchParams.get('activityId')
+          if (activityId !== null && (!/^\d+$/.test(activityId) || !Number.isSafeInteger(Number(activityId)) || Number(activityId) <= 0)) {
+            res.writeHead(400, CT).end(JSON.stringify({ ok: false, error: 'Invalid activity ID' }))
+            return
+          }
+          if (syncing) {
+            res.writeHead(409, CT).end(JSON.stringify({ ok: false, error: 'Ya hay una sincronización en curso. Inténtalo cuando termine.' }))
+            return
+          }
+          syncing = true
           const scriptPath = resolve(__dirname, 'fetch/sync.py')
+          const args = ['-u', scriptPath]
+          if (activityId !== null) args.push('--activity-id', activityId, '--force')
           let proc
           try {
-            proc = spawn(pythonCmd, [scriptPath], {
+            proc = spawn(pythonCmd, args, {
               cwd: resolve(__dirname),
               env: { ...process.env },
             })
           } catch (e) {
+            syncing = false
             res.writeHead(500, CT).end(JSON.stringify({ ok: false, log: `Spawn failed: ${String(e)}` }))
             return
           }
 
           const lines: string[] = []
-          proc.stdout.on('data', (d) => lines.push(d.toString()))
-          proc.stderr.on('data', (d) => lines.push(d.toString()))
+          proc.stdout.on('data', (d) => {
+            lines.push(d.toString())
+            process.stdout.write(d)
+          })
+          proc.stderr.on('data', (d) => {
+            lines.push(d.toString())
+            process.stderr.write(d)
+          })
           proc.on('error', (e) => {
+            syncing = false
             if (res.headersSent) return
             res.writeHead(500, CT)
             res.end(JSON.stringify({ ok: false, log: `Spawn error: ${String(e)}` }))
           })
 
           proc.on('close', (code) => {
+            syncing = false
             if (res.headersSent) return
             res.writeHead(code === 0 ? 200 : 500, CT)
-            res.end(JSON.stringify({ ok: code === 0, log: lines.join('') }))
+            const log = lines.join('')
+            const warnings = log.split('\n').filter(line => line.includes('WARNING:'))
+            res.end(JSON.stringify({ ok: code === 0, log, warnings }))
           })
         })
 
