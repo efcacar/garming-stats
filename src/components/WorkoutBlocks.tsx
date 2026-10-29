@@ -1,5 +1,6 @@
-import type { Lap, Sport, WorkoutBlock } from '../types/garmin'
+import type { ActivitySample, Lap, Sport, WorkoutBlock } from '../types/garmin'
 import { formatDuration, formatPace } from '../utils/formatters'
+import { cyclingDistanceSplits } from '../utils/distanceSplits'
 
 const BLOCK_STYLES: Record<string, { label: string; color: string }> = {
   INTERVAL_WARMUP: { label: 'Calentamiento', color: '#f59e0b' },
@@ -57,16 +58,21 @@ function PartialsTable({ laps, sport }: { laps: Lap[]; sport: Sport }) {
   )
 }
 
-export default function WorkoutBlocks({ blocks, laps, sport }: {
+export default function WorkoutBlocks({ blocks, laps, sport, samples }: {
   blocks: WorkoutBlock[] | undefined
   laps: Lap[]
   sport: Sport
+  samples?: ActivitySample[]
 }) {
-  if (!blocks?.length) {
+  const intervalBlocks = blocks?.filter(block => block.type?.startsWith('INTERVAL_')) ?? []
+
+  if (!intervalBlocks.length) {
+    const distanceSplits = sport === 'cycling' ? cyclingDistanceSplits(samples) : []
+    const partials = distanceSplits.length ? distanceSplits : laps
     return (
       <section className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
-        <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Parciales por distancia</h2>
-        {laps.length > 0 ? <PartialsTable laps={laps} sport={sport} /> : <p className="text-sm text-slate-500">
+        <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">{distanceSplits.length ? 'Parciales de 10 km' : 'Parciales por distancia'}</h2>
+        {partials.length > 0 ? <PartialsTable laps={partials} sport={sport} /> : <p className="text-sm text-slate-500">
           {blocks
             ? 'Garmin no proporciona parciales de distancia para esta actividad.'
             : 'Sincroniza para cargar los parciales originales de Garmin.'}
@@ -78,10 +84,10 @@ export default function WorkoutBlocks({ blocks, laps, sport }: {
   return (
     <section className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
       <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">
-        Tramos de entrenamiento · {blocks.length}
+        Tramos de entrenamiento · {intervalBlocks.length}
       </h2>
       <div className="space-y-2">
-        {blocks.map((block, index) => {
+        {intervalBlocks.map((block, index) => {
           const style = BLOCK_STYLES[block.type ?? '']
           const color = style?.color ?? '#94a3b8'
           const partials = block.lapIndexes.flatMap(lapIndex => {

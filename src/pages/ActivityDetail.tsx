@@ -175,7 +175,7 @@ export default function ActivityDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4 items-start">
         <div className="min-w-0">
-          {detail && <WorkoutBlocks blocks={detail.workoutBlocks} laps={detail.laps} sport={act.sport} />}
+          {detail && <WorkoutBlocks blocks={detail.workoutBlocks} laps={detail.laps} sport={act.sport} samples={detail.samples} />}
         </div>
         <div className="min-w-0 space-y-4">
       {/* HR Zones */}
