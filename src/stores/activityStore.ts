@@ -85,7 +85,7 @@ export const useActivityStore = create<ActivityState>()(
 
       loadStats: async () => {
         try {
-          const res = await fetch('/data/stats.json')
+          const res = await fetch('/data/stats.json', { cache: 'no-store' })
           if (!res.ok) return
           const data: GlobalStats = await res.json()
           set({ stats: data })
@@ -96,7 +96,7 @@ export const useActivityStore = create<ActivityState>()(
 
       loadGear: async () => {
         try {
-          const res = await fetch('/data/gear.json')
+          const res = await fetch('/data/gear.json', { cache: 'no-store' })
           if (!res.ok) return
           const data: GearItem[] = await res.json()
           set({ gear: data })
@@ -107,7 +107,7 @@ export const useActivityStore = create<ActivityState>()(
 
       loadSleep: async () => {
         try {
-          const res = await fetch('/data/sleep.json')
+          const res = await fetch('/data/sleep.json', { cache: 'no-store' })
           if (!res.ok) return
           const data: SleepEntry[] = await res.json()
           set({ sleep: data })
@@ -118,7 +118,7 @@ export const useActivityStore = create<ActivityState>()(
 
       loadWeight: async () => {
         try {
-          const res = await fetch('/data/weight.json')
+          const res = await fetch('/data/weight.json', { cache: 'no-store' })
           if (!res.ok) return
           const data: WeightEntry[] = await res.json()
           data.sort((a, b) => a.date.localeCompare(b.date))
@@ -130,7 +130,7 @@ export const useActivityStore = create<ActivityState>()(
 
       loadRecords: async () => {
         try {
-          const res = await fetch('/data/records.json')
+          const res = await fetch('/data/records.json', { cache: 'no-store' })
           if (!res.ok) return
           const data: GarminRecords = await res.json()
           set({ records: data })
@@ -141,7 +141,7 @@ export const useActivityStore = create<ActivityState>()(
 
       loadSettings: async () => {
         try {
-          const res = await fetch('/api/settings')
+          const res = await fetch('/api/settings', { cache: 'no-store' })
           if (!res.ok) {
             applyTheme(getSystemTheme())
             return

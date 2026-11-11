@@ -26,7 +26,7 @@ export default defineConfig({
         // GET /api/settings — read settings file
         server.middlewares.use('/api/settings', (req, res) => {
           if (res.headersSent) return
-          const CT = { 'Content-Type': 'application/json' }
+          const CT = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
           if (req.method === 'GET') {
             let content = '{}'
             try { content = readFileSync(settingsPath, 'utf-8') } catch { /* no file yet */ }
@@ -52,7 +52,7 @@ export default defineConfig({
         // POST /api/sync — run sync.py
         server.middlewares.use('/api/sync', (req, res) => {
           if (res.headersSent) return
-          const CT = { 'Content-Type': 'application/json' }
+          const CT = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
           if (req.method !== 'POST') {
             res.writeHead(405, CT).end(JSON.stringify({ error: 'Method not allowed' }))
             return
@@ -112,7 +112,7 @@ export default defineConfig({
         // POST /api/import-settings — fetch physiological data from Garmin
         server.middlewares.use('/api/import-settings', (req, res) => {
           if (res.headersSent) return
-          const CT = { 'Content-Type': 'application/json' }
+          const CT = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
           if (req.method !== 'POST') {
             res.writeHead(405, CT).end(JSON.stringify({ error: 'Method not allowed' }))
             return
