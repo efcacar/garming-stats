@@ -989,6 +989,7 @@ def main():
         except Exception as e:
             print(f"  WARNING: Failed to normalize activity {raw.get('activityId')}: {e}")
 
+    summaries.sort(key=lambda summary: summary.get("startTime") or "", reverse=True)
     selected_summaries = summaries
     if args.activity_id is not None:
         summary_path = output_dir / "activities.json"
@@ -1002,6 +1003,7 @@ def main():
     restore_summary_temperatures(summaries, output_dir)
     save_json(output_dir / "activities.json", summaries)
     print(f"Saved {len(summaries)} activity summaries -> public/data/activities.json")
+    print("SYNC_DATA_UPDATED", flush=True)
 
     # Step 3: Fetch and save details for each activity
     print(f"\nFetching details for {len(selected_summaries)} activities (rate-limited)...")
@@ -1031,6 +1033,7 @@ def main():
             failed_activities.append(activity_id)
             print(f"  WARNING: Failed to process detail for {activity_id}: {e}")
 
+        print("SYNC_DATA_UPDATED", flush=True)
         # Rate limiting — critical to avoid Garmin banning the account
         time.sleep(0.5)
 

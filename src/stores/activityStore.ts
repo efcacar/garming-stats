@@ -177,10 +177,12 @@ export const useActivityStore = create<ActivityState>()(
       loadDetail: async (id: number) => {
         const cached = get().detailCache[id]
         if (cached) return cached
+        const activities = get().activities
         try {
           const res = await fetch(`/data/activity_${id}.json`, { cache: 'no-store' })
           if (!res.ok) return null
           const detail: ActivityDetail = await res.json()
+          if (activities !== get().activities) return get().loadDetail(id)
           set(state => ({ detailCache: { ...state.detailCache, [id]: detail } }))
           return detail
         } catch {

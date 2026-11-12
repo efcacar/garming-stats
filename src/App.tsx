@@ -36,6 +36,38 @@ export default function App() {
     loadWeight()
   }, [loadActivities, loadStats, loadSettings, loadRecords, loadSleep, loadGear, loadWeight])
 
+  useEffect(() => {
+    let revision: number | null = null
+    let stopped = false
+    let pending = false
+    let reportedError = false
+
+    async function checkSyncProgress() {
+      if (pending) return
+      pending = true
+      try {
+        const response = await fetch('/api/sync-status', { cache: 'no-store' })
+        if (!response.ok) throw new Error(`Estado de sincronización: ${response.status}`)
+        const status: { dataRevision: number } = await response.json()
+        if (stopped) return
+        if (revision !== status.dataRevision) {
+          revision = status.dataRevision
+          if (revision > 0) await loadActivities()
+        }
+        reportedError = false
+      } catch (error) {
+        if (!stopped && !reportedError) console.error('[Sync] No se pudo consultar el progreso:', error)
+        reportedError = true
+      } finally {
+        pending = false
+      }
+    }
+
+    checkSyncProgress()
+    const timer = setInterval(checkSyncProgress, 3000)
+    return () => { stopped = true; clearInterval(timer) }
+  }, [loadActivities])
+
   // Auto-sync when last sync date is not today
   useEffect(() => {
     if (!stats?.syncedAt) return

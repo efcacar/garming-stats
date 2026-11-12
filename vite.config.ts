@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { spawn } from 'node:child_process'
+import { createInterface } from 'node:readline'
 import { resolve } from 'node:path'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 
@@ -22,6 +23,16 @@ export default defineConfig({
         const venvPython = resolve(__dirname, '.venv/bin/python')
         const pythonCmd = process.env.GARMIN_PYTHON ?? (existsSync(venvPython) ? venvPython : 'python3')
         let syncing = false
+        let dataRevision = 0
+
+        server.middlewares.use('/api/sync-status', (req, res) => {
+          const CT = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+          if (req.method !== 'GET') {
+            res.writeHead(405, CT).end(JSON.stringify({ error: 'Method not allowed' }))
+            return
+          }
+          res.writeHead(200, CT).end(JSON.stringify({ syncing, dataRevision }))
+        })
 
         // GET /api/settings — read settings file
         server.middlewares.use('/api/settings', (req, res) => {
@@ -84,6 +95,9 @@ export default defineConfig({
           }
 
           const lines: string[] = []
+          createInterface({ input: proc.stdout }).on('line', line => {
+            if (line === 'SYNC_DATA_UPDATED') dataRevision += 1
+          })
           proc.stdout.on('data', (d) => {
             lines.push(d.toString())
             process.stdout.write(d)
